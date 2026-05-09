@@ -1,12 +1,15 @@
 
 
 
-A django app (use uv as package manager).
-It is a rewrite of the counter.dev web analytics platform.
+
+# Stack
+Go framework — Gin
+ORM — sqlc + pgx
+Migrations - Tern.
 
 
 # API
-It is a rest API (use django-rest)
+It is a rest API
 
 ## Base API
 
