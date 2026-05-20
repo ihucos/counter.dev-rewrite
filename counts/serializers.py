@@ -1,18 +1,23 @@
 from rest_framework import serializers
 
-from .models import Site
+from .models import Host
 
 
-class SiteSerializer(serializers.ModelSerializer):
+class HostSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Site
-        fields = ["id", "domain"]
-        read_only_fields = ["id"]
+        model = Host
+        fields = ["name"]
 
 
-class IngressEntrySerializer(serializers.Serializer):
+class IngressRequestSerializer(serializers.Serializer):
     user = serializers.CharField()
-    site = serializers.CharField()
-    metric = serializers.CharField(max_length=64)
-    value = serializers.CharField(max_length=255)
+    host = serializers.CharField()
+    metric = serializers.CharField()
+    value = serializers.CharField()
     incr = serializers.IntegerField()
+
+
+class QueryRequestSerializer(serializers.Serializer):
+    site = serializers.CharField()
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)

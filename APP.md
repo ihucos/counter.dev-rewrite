@@ -1,6 +1,3 @@
-
-
-
 A django app (use uv as package manager).
 It is a rewrite of the counter.dev web analytics platform.
 
@@ -18,16 +15,16 @@ It is a rest API (use django-rest)
 - email can be changed
 - Password can be recovered
 - Timezone can be changed
-- Change the listed domains options
+- Change the listed hosts options
 - There is a json object with simple preferences that can be changed.
 - Delete account
-- Delete site
+- Delete host
 
 
 ## Data Ingress:
 as POST data we get a list of objects with the following fields: user, site, metric, value, incr (int)
 In a batched manner we:
-- Create site objects that do not exist yet for the user. Ignore entries with users that do not exist.
+- Create host objects that do not exist yet for the user. Ignore entries with users that do not exist.
 - Increment the count on the respective Count objects
 
 ### Authentication
@@ -60,16 +57,16 @@ class User:
     timezone: int # an utc offset (for now) 
     prefs: dict[str, str]
 
-class Site:
-    user_id: str (
+class Host:
+    user_id: str
     user: User
-    domain: str
+    name: str
     allowed_domains: list[str] (default [])
     filter_allowed_domains: bool (default False)
     
 
 class Count
-    site: Site
+    host: Host
     date: Date
     metric: str
     value: str

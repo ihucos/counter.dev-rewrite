@@ -1,16 +1,16 @@
 from django.contrib import admin
 
-from .models import Count, Site
+from .models import Count, Host
 
 
-@admin.register(Site)
-class SiteAdmin(admin.ModelAdmin):
-    list_display = ("domain", "user")
-    search_fields = ("domain", "user__username")
+@admin.register(Host)
+class HostAdmin(admin.ModelAdmin):
+    list_display = ("name", "user")
+    search_fields = ("name", "user__username")
 
 
 @admin.register(Count)
 class CountAdmin(admin.ModelAdmin):
-    list_display = ("site", "date", "metric", "value", "count")
+    list_display = ("host", "date", "metric", "value", "count")
     list_filter = ("metric", "date")
-    search_fields = ("site__domain", "value")
+    search_fields = ("host__name", "value")
