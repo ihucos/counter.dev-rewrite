@@ -17,3 +17,6 @@ Write the code to make it happen.
 
 ##### Vanilla is AI-Friendly
 Leverage what the training data has seen the most.
+
+##### It will all run in one machine
+No premature optimization: Scale vertically until horizontal scaling is needed.
