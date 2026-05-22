@@ -17,3 +17,11 @@ services:
     platform: linux/arm64
     ports:
       - "6379:6379"
+
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    platform: linux/arm64
+    ports:
+      - "5432:5432"

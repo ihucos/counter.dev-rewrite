@@ -1,0 +1,5 @@
+FROM postgres:16-alpine
+ENV POSTGRES_DB=counter
+ENV POSTGRES_USER=counter
+ENV POSTGRES_PASSWORD=counter
+EXPOSE 5432

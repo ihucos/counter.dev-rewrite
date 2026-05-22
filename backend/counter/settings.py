@@ -55,8 +55,12 @@ WSGI_APPLICATION = "counter.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "counter",
+        "USER": "counter",
+        "PASSWORD": "counter",
+        "HOST": "localhost",
+        "PORT": 5432,
     }
 }
 
@@ -98,3 +102,6 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@counter.dev")
 PASSWORD_RESET_URL_BASE = os.environ.get(
     "PASSWORD_RESET_URL_BASE", "https://counter.dev/reset"
 )
+```
+
+```markdown--- a/backend/Dockerfile
