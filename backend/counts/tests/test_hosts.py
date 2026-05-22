@@ -29,4 +29,4 @@ class TestHostViewSet:
     def test_unauthenticated_cannot_access_hosts(self, api_client):
         url = reverse("host-list")
         response = api_client.get(url)
-        assert response.status_code == status.HTTP_403_FORBIDDEN--- a/backend/counts/tests/test_query.py
+        assert response.status_code == status.HTTP_403_FORBIDDEN
