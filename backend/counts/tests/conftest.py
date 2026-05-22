@@ -1,0 +1,68 @@
+import pytest
+from datetime import date, timedelta
+from rest_framework.test import APIClient
+
+from accounts.models import User
+from counts.models import Count, Host
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+@pytest.fixture
+def user(db):
+    return User.objects.create_user(
+        username="testuser",
+        password="testpass123",
+        timezone=0,
+    )
+
+
+@pytest.fixture
+def other_user(db):
+    return User.objects.create_user(
+        username="otheruser",
+        password="otherpass123",
+        timezone=0,
+    )
+
+
+@pytest.fixture
+def host(db, user):
+    return Host.objects.create(user=user, name="example.com")
+
+
+@pytest.fixture
+def other_host(db, other_user):
+    return Host.objects.create(user=other_user, name="other.com")
+
+
+@pytest.fixture
+def counts(db, host):
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+
+    Count.objects.create(
+        host=host, date=today, metric="pageview", value="/home", count=10
+    )
+    Count.objects.create(
+        host=host, date=today, metric="pageview", value="/about", count=5
+    )
+    Count.objects.create(
+        host=host, date=yesterday, metric="pageview", value="/home", count=3
+    )
+    Count.objects.create(
+        host=host, date=today, metric="click", value="button1", count=2
+    )
+    return Count.objects.all()
+
+
+@pytest.fixture
+def other_counts(db, other_host):
+    today = date.today()
+    Count.objects.create(
+        host=other_host, date=today, metric="pageview", value="/other", count=100
+    )
+    return Count.objects.all()--- a/backend/counts/tests/test_hosts.py
