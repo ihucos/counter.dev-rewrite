@@ -3,6 +3,13 @@ from django.db import models
 
 
 class Host(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="hosts",
+    )
+    name = models.CharField(max_length=253)
+
     class Meta:
         unique_together = [("user", "name")]
 
@@ -11,12 +18,11 @@ class Host(models.Model):
 
 
 class Count(models.Model):
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    host = models.ForeignKey(
+        Host,
         on_delete=models.CASCADE,
-        related_name="hosts",
+        related_name="counts",
     )
-    host = models.CharField(max_length=253)
     date = models.DateField()
     metric = models.CharField(max_length=64)
     value = models.CharField(max_length=255)
