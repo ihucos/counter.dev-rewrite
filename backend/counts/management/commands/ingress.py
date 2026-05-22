@@ -21,14 +21,13 @@ class Command(BaseCommand):
         # cache._cache is a RedisCacheClient, which has get_client() returning redis.Redis
         redis = cache._cache.get_client()
 
+        cursor = 0
         while True:
             # SCAN for keys matching the specific pattern
-            cursor, keys = redis.scan(
-                cursor=cursor, match="v:*,*,*,*-*-*", count=iteration_chunk_size
-            )
+            cursor, keys = redis.scan(cursor=cursor, match="v:*,*,*,*-*-*", count=10)
 
             # Transaction??
-            pipeline = redis_conn.pipeline(transaction=False)
+            pipeline = redis.pipeline(transaction=False)
 
             for key in keys:
                 try:
@@ -48,4 +47,5 @@ class Command(BaseCommand):
             # result = redis.echo("hello from redis via django cache")
             # print(f"Redis echo: {result}")
             #
-            sleep(3)
+            # sleep(3)
+            break
