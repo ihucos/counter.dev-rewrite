@@ -102,6 +102,3 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@counter.dev")
 PASSWORD_RESET_URL_BASE = os.environ.get(
     "PASSWORD_RESET_URL_BASE", "https://counter.dev/reset"
 )
-```
-
-```markdown--- a/backend/Dockerfile
