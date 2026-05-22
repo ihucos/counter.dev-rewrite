@@ -78,5 +78,29 @@ def ingress(request):
         ignore_conflicts=True,
     )
 
+
+# from django.db import connection
+#
+# updates = {123: 5, 567: 1}
+#
+# # Flatten the dict into an array of tuples: [(5, 123), (1, 567)]
+# data_matrix = [(val, pk) for pk, val in updates.items() if val != 0]
+#
+# # Build a fast mass-update using a virtual data table
+# query = """
+#     UPDATE myapp_product AS p
+#     SET stock = p.stock + u.increment
+#     FROM (VALUES %s) AS u(increment, id)
+#     WHERE p.id = u.id;
+# """
+
+with connection.cursor() as cursor:
+    # execute_values handles parsing the array of tuples instantly (PostgreSQL specific feature)
+    cursor.execute(query, [data_matrix])
+
     # Fetch host objects in bulk
     # ...
+
+    # Just dump the counts
+
+    # Then merge them later
