@@ -64,6 +64,13 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+    }
+}
+
 AUTH_USER_MODEL = "accounts.User"
 
 LANGUAGE_CODE = "en-us"
