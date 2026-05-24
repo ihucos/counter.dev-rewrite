@@ -2,9 +2,12 @@ from django.core.management.base import BaseCommand, CommandError
 from counts.models import Count, Host
 from time import sleep
 from django.core.cache import cache
+from django.db.models.query_utils import Q
 
 # TODO: All keys can be hashes after the big app rewrite
 ZET_KEYS = ["lang", "ref", "loc", "page"]
+# from .... import models
+from accounts.models import User
 
 
 class Command(BaseCommand):
@@ -12,6 +15,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
+
+    def parse_key(self, key):
+        if not key.startswith(b"v:"):
+            raise ValueError("bad key")
+        key = key[len(b"v:") :]
+        try:
+            host, user, metric, date = key.split(b",")
+        except ValueError:
+            raise ValueError("bad key")
+        # urldecode!!
+        return host, user, metric, date
 
     def handle(self, *args, **options):
         forever = options["forever"]
@@ -23,29 +37,52 @@ class Command(BaseCommand):
 
         cursor = 0
         while True:
-            # SCAN for keys matching the specific pattern
             cursor, keys = redis.scan(cursor=cursor, match="v:*,*,*,*-*-*", count=10)
-
-            # Transaction??
-            pipeline = redis.pipeline(transaction=False)
-
+            pipeline = redis.pipeline()
+            keys_parts = []
             for key in keys:
                 try:
-                    _, user, host, metric, date = key.split(":")
+                    key_parts = self.parse_key(key)
                 except ValueError:
-                    continue  # Skip malformed keys safely
-
-                if metric in ZET_KEYS:
-                    pipeline.hgetall(key)
-                else:
-                    pipeline.zrange(key, 0, -1, withscores=True)
+                    continue
+                keys_parts.append(key_parts)
+                pipeline.hgetall(key)
 
             redis_response = pipeline.execute()
-            print(redis_response)
-            print(keys)
 
-            # result = redis.echo("hello from redis via django cache")
-            # print(f"Redis echo: {result}")
-            #
-            # sleep(3)
-            break
+            self._ingress_batch(
+                [
+                    list(  # use * at python 3.15
+                        {
+                            "user": user,
+                            "host": host,
+                            "metric": metric,
+                            "date": date,
+                            "value": value,
+                            "count": count,
+                        }
+                        for (value, count) in vals.items()
+                    )
+                    for ((host, user, metric, date), vals) in zip(
+                        keys_parts, redis_response
+                    )
+                ]
+            )
+
+    def _ingress_batch(self, vals):
+        # Hack
+        vals_new = []
+        for i in vals:
+            vals_new.extend(i)
+        vals = vals_new
+
+        user_identifiables = [i["user"] for i in vals]
+        # use get_user_model
+
+        # matched_users = User.objects.filter(Q(username__in=user) | Q(id__in=[]))
+        user_map = User.objects.in_bulk(user_identifiables, field_name="username")
+
+        print(user_identifiables)
+        print(user_map)
+
+        assert 0

@@ -23,9 +23,10 @@ def redis():
 
 @pytest.fixture(autouse=True)
 def clean_cache(redis):
-    yield
     # Sanity check
     assert redis.connection_pool.connection_kwargs["db"] != 0, "Refusing to flush db 0"
+    redis.flushall()
+    yield
     redis.flushall()
 
 
