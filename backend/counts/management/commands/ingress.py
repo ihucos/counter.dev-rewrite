@@ -55,54 +55,34 @@ class Command(BaseCommand):
 
             self._ingress_batch(
                 [
-                    list(  # use * at python 3.15
-                        {
-                            "user": user,
-                            "host": host,
-                            "metric": metric,
-                            "date": date,
-                            "value": value,
-                            "count": count,
-                        }
-                        for (value, count) in vals.items()
-                    )
+                    {
+                        "host": host,
+                        "user": user,
+                        "metric": metric,
+                        "date": date,
+                        "value": value,
+                        "count": count,
+                    }
                     for ((host, user, metric, date), vals) in zip(
                         keys_parts, redis_response
                     )
+                    for (value, count) in vals.items()
                 ]
             )
 
     def _ingress_batch(self, vals):
         vals = list(vals)
 
-        # Hack
-        vals_new = []
-        for i in vals:
-            vals_new.extend(i)
-        vals = vals_new
-
         # Map users specified in redis to database users
-        user_identifiables = [i["user"] for i in vals]  # use get_user_model
-        user_map = {}
-        user_map.update(User.objects.in_bulk(user_identifiables, field_name="id"))
-        user_map.update(User.objects.in_bulk(user_identifiables, field_name="username"))
+        user_map = {
+            **User.objects.in_bulk([i["user"] for i in vals], field_name="id"),
+            **User.objects.in_bulk([i["user"] for i in vals], field_name="username"),
+        }
 
         # Drop users not in database
         for v in list(vals):
             if v["user"] not in user_map:
                 vals.remove(v)
-
-        # # Create missing hosts
-        # models.Host.objects.bulk_create(
-        #     [models.Host(user=user_map[v["user"]], name=v["host"]) for v in vals],
-        #     ignore_conflicts=True,
-        # )
-        #
-        # # Fetch hosts
-        # q = Q()
-        # for v in vals:
-        #     q = q | (Q(user=user_map[v["user"]]) & Q(name=v["host"]))
-        # hosts = models.Host.objects.filter(q)
 
         # bulk create with update_conflcits
         hosts = Host.objects.bulk_create(
@@ -121,7 +101,7 @@ class Command(BaseCommand):
                     metric=v["metric"],
                     date=v["date"],
                     value=v["value"],
-                    count=v["count"],
+                    count=0,
                 )
                 for v in vals
             ],
@@ -129,3 +109,15 @@ class Command(BaseCommand):
             unique_fields=["host", "date", "metric", "value"],
             update_fields=["host", "date", "metric", "value"],
         )
+
+        # Add the counts from redis to the new counts or existing counts in postgres
+        for count_obj, count in zip(counts, (i["count"] for i in vals)):
+            count_obj.count = count
+        models.Count.objects.bulk_create(
+            counts,
+            unique_fields=["host", "date", "metric", "value"],
+            update_fields=["count"],
+        )
+        import time
+
+        print(time.time())
