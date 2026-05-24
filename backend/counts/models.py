@@ -6,7 +6,6 @@ class Host(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="hosts",
     )
     name = models.CharField(max_length=253)
 
@@ -21,7 +20,6 @@ class Count(models.Model):
     host = models.ForeignKey(
         Host,
         on_delete=models.CASCADE,
-        related_name="counts",
     )
     date = models.DateField()
     metric = models.CharField(max_length=64)

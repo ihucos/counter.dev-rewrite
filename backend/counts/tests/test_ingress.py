@@ -4,11 +4,20 @@ import pytest
 
 # User get_user_model
 from accounts.models import User
+from .. import models
 
 
 @pytest.fixture
 def user_data():
-    User.objects.create(username="ApplePerson")
+    User.objects.get_or_create(username="ApplePerson")
+    User.objects.get_or_create(username="meisen")
+
+
+@pytest.fixture
+def host_data():
+    models.Host.objects.create(
+        name="apple.store", user=User.objects.get_or_create(username="ApplePerson")[0]
+    )
 
 
 @pytest.fixture
@@ -93,5 +102,5 @@ def redis_data(redis):
 
 
 class TestIngressView:
-    def test_does_not_die_badly(self, db, user_data, redis_data):
+    def test_does_not_die_badly(self, db, user_data, host_data, redis_data):
         call_command("ingress", forever=True)
