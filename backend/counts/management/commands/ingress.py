@@ -118,6 +118,3 @@ class Command(BaseCommand):
             unique_fields=["host", "date", "metric", "value"],
             update_fields=["count"],
         )
-        import time
-
-        print(time.time())
