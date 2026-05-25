@@ -37,28 +37,21 @@ class Command(BaseCommand):
 
     def _fetch_keys(self, keys) -> dict:
         pipeline = self.redis.pipeline()
-        # keys_parts = []
         for key in keys:
-            # try:
-            #     key_parts = self._parse_key(key)
-            # except ValueError:
-            #     continue
-            # keys_parts.append(key_parts)
             pipeline.hgetall(key)
-        redis_response = pipeline.execute()
-        # return dict(zip(keys_parts, redis_response))
-        return dict(zip(keys, redis_response))
+        return dict(zip(keys, pipeline.execute()))
 
-    def _handle_keys(self, keys):
+    def _handle_keys_batch(self, keys):
         # This can fail
         keys = [i.decode() for i in keys]
 
         keys_with_vals = self._fetch_keys(keys)
-        pretty_keys_with_vals = {
+        parsed_keys_with_vals = {
             self._parse_key(key): val for (key, val) in keys_with_vals.items()
         }
 
-        self._save_batch(
+        # TODO: dict frozendict FTW!!!
+        self._save_values_batch(
             [
                 {
                     "host": host,
@@ -68,28 +61,27 @@ class Command(BaseCommand):
                     "value": value,
                     "count": count,
                 }
-                for ((host, user, metric, date), vals) in pretty_keys_with_vals.items()
+                for ((host, user, metric, date), vals) in parsed_keys_with_vals.items()
                 for (value, count) in vals.items()
             ]
         )
 
     def handle(self, *args, **options):
         forever = options["forever"]
-
-        # Get the raw Redis client from Django's cache backend
-        # cache._cache is a RedisCacheClient, which has get_client() returning redis.Redis
-
         cursor = 0
         while True:
             cursor, keys = self.redis.scan(
                 cursor=cursor, match="v:*,*,*,*-*-*", count=10
             )
-            self._handle_keys(keys)
+            self._handle_keys_batch(keys)
 
             if not forever:
                 break
 
-    def _save_batch(self, vals: list[dict]):
+    def _save_values_batch(self, vals: list[dict]):
+        """
+        Increment values batch into postgres
+        """
         vals = list(vals)
 
         # Map users specified in redis to database users
@@ -116,6 +108,7 @@ class Command(BaseCommand):
             unique_fields=["user", "name"],
             update_fields=["user", "name"],
         )
+        # Frozendict!
         hosts_map = {(i.user_id, i.name): i for i in hosts}
 
         # Create or "get" (via update_conclits" hack) counts
