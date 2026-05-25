@@ -126,3 +126,7 @@ class TestIngressView:
         call_command("ingress")
         count = models.Count.objects.get()
         assert count.host.name == "website.com"
+        assert count.host.user.username == "peter"
+        assert count.metric == "loc"
+        assert count.value == b"/"
+        assert count.count == 2
