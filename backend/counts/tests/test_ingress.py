@@ -116,3 +116,13 @@ class TestIngressView:
     def test_does_not_die_badly(self, db, user_data, host_data, redis_data):
         call_command("ingress")
         call_command("ingress")
+
+    def test_simple(self, db, redis):
+        User.objects.get_or_create(username="peter")
+        redis.hset(
+            "v:website.com,peter,loc,2026-05-21",
+            mapping={"/": 2},
+        )
+        call_command("ingress")
+        count = models.Count.objects.get()
+        assert count.host.name == "website.com"
