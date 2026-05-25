@@ -1,5 +1,15 @@
 import os
 from pathlib import Path
+import socket
+
+
+def host(h):
+    try:
+        socket.gethostbyname(h)
+        return h
+    except socket.gaierror:
+        return "localhost"
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -59,7 +69,7 @@ DATABASES = {
         "NAME": "counter",
         "USER": "counter",
         "PASSWORD": "counter",
-        "HOST": "postgres",
+        "HOST": host("postgres"),
         "PORT": 5432,
     }
 }
@@ -67,7 +77,7 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://redis:6379/0",
+        "LOCATION": f"redis://{host('redis')}:6379/0",
     }
 }
 

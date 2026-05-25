@@ -26,6 +26,8 @@ services:
     build:
       context: ./redis
       dockerfile: Dockerfile
+    ports:
+      - "6379:6379"
     platform: linux/arm64
     volumes:
       - redis_data:/data
@@ -34,6 +36,8 @@ services:
     build:
       context: ./postgres
       dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
     platform: linux/arm64
     volumes:
       - postgres_data:/var/lib/postgresql/data

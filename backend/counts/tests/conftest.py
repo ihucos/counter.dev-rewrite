@@ -5,17 +5,18 @@ from django.core.cache import CacheHandler
 
 from accounts.models import User
 from counts.models import Count, Host
+from django.core.cache import cache
 
 
 @pytest.fixture
-def redis():
+def redis(settings):
     """Return a test Redis connection using the test database (db 5)."""
 
     return CacheHandler(
         {
             "default": {
                 "BACKEND": "django.core.cache.backends.redis.RedisCache",
-                "LOCATION": "redis://redis:6379/5",
+                "LOCATION": "redis://localhost:6379/5",
             }
         }
     )["default"]._cache.get_client()
@@ -30,14 +31,10 @@ def clean_cache(redis):
     redis.flushall()
 
 
-@pytest.fixture(autouse=True)
-def global_test_settings(settings):
-    settings.CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": "redis://redis:6379/5",  # Use db number 5,
-        }
-    }
+# @pytest.fixture(autouse=True)
+# def global_test_settings(settings):
+#     settings.CACHES["default"]["LOCATION"] += "0"
+#     # "LOCATION": "redis://redis:6379/5",  # Use db number 5,
 
 
 @pytest.fixture
