@@ -4,19 +4,27 @@ from time import sleep
 from django.core.cache import cache
 from django.db.models.query_utils import Q
 
-# TODO: All keys can be hashes after the big app rewrite
-ZET_KEYS = ["lang", "ref", "loc", "page"]
 from ... import models
 from accounts.models import User
+
+
+def unique_dicts(lst: list[dict]) -> list[dict]:
+    unique_list = set()
+    for dic in lst:
+        unique_list.add(tuple(sorted(dic.items())))
+    return [dict(i) for i in unique_list]
 
 
 class Command(BaseCommand):
     help = "Ingress data into the Counts app, creating or updating Count records."
 
+    def __init__(self):
+        self.redis = cache._cache.get_client()
+
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
 
-    def parse_key(self, key):
+    def _parse_key(self, key):
         if not key.startswith("v:"):
             raise ValueError("bad key")
         key = key[len(b"v:") :]
@@ -27,52 +35,55 @@ class Command(BaseCommand):
         # urldecode!!
         return host, user, metric, date
 
+    def _handle_keys(self, keys):
+        # This can fail
+        keys = [i.decode() for i in keys]
+
+        pipeline = self.redis.pipeline()
+        keys_parts = []
+        for key in keys:
+            try:
+                key_parts = self._parse_key(key)
+            except ValueError:
+                continue
+            keys_parts.append(key_parts)
+            pipeline.hgetall(key)
+        redis_response = pipeline.execute()
+
+        self._save_batch(
+            [
+                {
+                    "host": host,
+                    "user": user,
+                    "metric": metric,
+                    "date": date,
+                    "value": value,
+                    "count": count,
+                }
+                for ((host, user, metric, date), vals) in zip(
+                    keys_parts, redis_response
+                )
+                for (value, count) in vals.items()
+            ]
+        )
+
     def handle(self, *args, **options):
         forever = options["forever"]
 
         # Get the raw Redis client from Django's cache backend
         # cache._cache is a RedisCacheClient, which has get_client() returning redis.Redis
-        redis = cache._cache.get_client()
 
         cursor = 0
         while True:
-            cursor, keys = redis.scan(cursor=cursor, match="v:*,*,*,*-*-*", count=10)
-
-            # This can fail
-            keys = [i.decode() for i in keys]
-
-            pipeline = redis.pipeline()
-            keys_parts = []
-            for key in keys:
-                try:
-                    key_parts = self.parse_key(key)
-                except ValueError:
-                    continue
-                keys_parts.append(key_parts)
-                pipeline.hgetall(key)
-            redis_response = pipeline.execute()
-
-            self._save_batch(
-                [
-                    {
-                        "host": host,
-                        "user": user,
-                        "metric": metric,
-                        "date": date,
-                        "value": value,
-                        "count": count,
-                    }
-                    for ((host, user, metric, date), vals) in zip(
-                        keys_parts, redis_response
-                    )
-                    for (value, count) in vals.items()
-                ]
+            cursor, keys = self.redis.scan(
+                cursor=cursor, match="v:*,*,*,*-*-*", count=10
             )
+            self._handle_keys(keys)
 
             if not forever:
                 break
 
-    def _save_batch(self, vals):
+    def _save_batch(self, vals: list[dict]):
         vals = list(vals)
 
         # Map users specified in redis to database users
@@ -82,13 +93,19 @@ class Command(BaseCommand):
         }
 
         # Remove users not in database
-        for v in list(vals):
-            if v["user"] not in user_map:
-                vals.remove(v)
+        vals = [val for val in vals if val["user"] in user_map]
 
-        # bulk create hosts with update_conflcits
+        # Create or "get" (via update_conclits" hack) hosts
         hosts = Host.objects.bulk_create(
-            [Host(user=user_map[v["user"]], name=v["host"]) for v in vals],
+            [
+                models.Host(**i)
+                for i in unique_dicts(
+                    [
+                        {"user_id": user_map[v["user"]].id, "name": v["host"]}
+                        for v in vals
+                    ]
+                )
+            ],
             update_conflicts=True,
             unique_fields=["user", "name"],
             update_fields=["user", "name"],
@@ -112,7 +129,7 @@ class Command(BaseCommand):
             update_fields=["host", "date", "metric", "value"],
         )
 
-        # Add the counts from redis to the new counts or existing counts in postgres
+        # Add the counts from redis to the counts loaded into the models
         for count_obj, count in zip(counts, (i["count"] for i in vals)):
             count_obj.count = count
         models.Count.objects.bulk_create(
