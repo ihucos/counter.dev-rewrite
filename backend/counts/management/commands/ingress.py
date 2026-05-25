@@ -35,17 +35,19 @@ class Command(BaseCommand):
         # urldecode!!
         return host, user, metric, date
 
-    def _fetch_keys(self, keys) -> dict:
+    def _pop_keys(self, keys) -> dict:
         pipeline = self.redis.pipeline()
         for key in keys:
             pipeline.hgetall(key)
+        for key in keys:
+            pipeline.delete(key)
         return dict(zip(keys, pipeline.execute()))
 
     def _handle_keys_batch(self, keys):
         # This can fail
         keys = [i.decode() for i in keys]
 
-        keys_with_vals = self._fetch_keys(keys)
+        keys_with_vals = self._pop_keys(keys)
         parsed_keys_with_vals = {
             self._parse_key(key): val for (key, val) in keys_with_vals.items()
         }
