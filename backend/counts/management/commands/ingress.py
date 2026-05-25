@@ -35,20 +35,28 @@ class Command(BaseCommand):
         # urldecode!!
         return host, user, metric, date
 
+    def _fetch_keys(self, keys) -> dict:
+        pipeline = self.redis.pipeline()
+        # keys_parts = []
+        for key in keys:
+            # try:
+            #     key_parts = self._parse_key(key)
+            # except ValueError:
+            #     continue
+            # keys_parts.append(key_parts)
+            pipeline.hgetall(key)
+        redis_response = pipeline.execute()
+        # return dict(zip(keys_parts, redis_response))
+        return dict(zip(keys, redis_response))
+
     def _handle_keys(self, keys):
         # This can fail
         keys = [i.decode() for i in keys]
 
-        pipeline = self.redis.pipeline()
-        keys_parts = []
-        for key in keys:
-            try:
-                key_parts = self._parse_key(key)
-            except ValueError:
-                continue
-            keys_parts.append(key_parts)
-            pipeline.hgetall(key)
-        redis_response = pipeline.execute()
+        keys_with_vals = self._fetch_keys(keys)
+        pretty_keys_with_vals = {
+            self._parse_key(key): val for (key, val) in keys_with_vals.items()
+        }
 
         self._save_batch(
             [
@@ -60,9 +68,7 @@ class Command(BaseCommand):
                     "value": value,
                     "count": count,
                 }
-                for ((host, user, metric, date), vals) in zip(
-                    keys_parts, redis_response
-                )
+                for ((host, user, metric, date), vals) in pretty_keys_with_vals.items()
                 for (value, count) in vals.items()
             ]
         )
