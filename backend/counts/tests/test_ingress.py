@@ -11,6 +11,17 @@ from .. import models
 def user_data():
     User.objects.get_or_create(username="ApplePerson")
     User.objects.get_or_create(username="meisen")
+    User.objects.get_or_create(username="eduard")
+    User.objects.get_or_create(username="yum")
+    User.objects.get_or_create(username="miako")
+    User.objects.get_or_create(username="dora")
+    User.objects.get_or_create(username="0x93")
+    User.objects.get_or_create(username="supar")
+    User.objects.get_or_create(username="Supb")
+    User.objects.get_or_create(username="UPPERCASE")
+    User.objects.get_or_create(username="miguel")
+    User.objects.get_or_create(username="DancingRain")
+    User.objects.get_or_create(username="valerie")
 
 
 @pytest.fixture
@@ -39,7 +50,7 @@ def redis_data(redis):
         mapping={"/": 50, "/privacy.html": 20, "/blog": 31},
     )
     redis.hset(
-        "v:bud.org,miakatojamazi,lang,2026-05-23",
+        "v:bud.org,miako,lang,2026-05-23",
         mapping={"de": 4, "en": 30},
     )
     redis.hset(
@@ -54,7 +65,7 @@ def redis_data(redis):
         mapping={"2026-05-23": 50},
     )
     redis.hset(
-        "v:dash-3.reef.pl,supar,platform,2026-05-22",
+        "v:dash-3.reef.pl,dora,platform,2026-05-22",
         mapping={"Android": 1},  # wrong key
     )
     redis.hset(
@@ -62,7 +73,7 @@ def redis_data(redis):
         mapping={"https://ab.co.uk": 4},
     )
     redis.hset(
-        "v:dacomic.co.ke,UPERCASE,browser,2026-05-23",
+        "v:dacomic.co.ke,UPPERCASE,browser,2026-05-23",
         mapping={"Chrome": 1, "Safari": 3},
     )
     redis.hset(
@@ -103,4 +114,5 @@ def redis_data(redis):
 
 class TestIngressView:
     def test_does_not_die_badly(self, db, user_data, host_data, redis_data):
-        call_command("ingress", forever=True)
+        call_command("ingress")
+        call_command("ingress")

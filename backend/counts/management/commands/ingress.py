@@ -29,7 +29,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         forever = options["forever"]
-        assert forever, "only --forever is supported"
 
         # Get the raw Redis client from Django's cache backend
         # cache._cache is a RedisCacheClient, which has get_client() returning redis.Redis
@@ -53,7 +52,7 @@ class Command(BaseCommand):
                 pipeline.hgetall(key)
             redis_response = pipeline.execute()
 
-            self._ingress_batch(
+            self._save_batch(
                 [
                     {
                         "host": host,
@@ -70,7 +69,10 @@ class Command(BaseCommand):
                 ]
             )
 
-    def _ingress_batch(self, vals):
+            if not forever:
+                break
+
+    def _save_batch(self, vals):
         vals = list(vals)
 
         # Map users specified in redis to database users
@@ -79,12 +81,13 @@ class Command(BaseCommand):
             **User.objects.in_bulk([i["user"] for i in vals], field_name="username"),
         }
 
-        # Drop users not in database
+        # Remove users not in database
         for v in list(vals):
             if v["user"] not in user_map:
                 vals.remove(v)
 
-        # bulk create with update_conflcits
+        # bulk create hosts with update_conflcits
+        print(vals)
         hosts = Host.objects.bulk_create(
             [Host(user=user_map[v["user"]], name=v["host"]) for v in vals],
             update_conflicts=True,
@@ -115,6 +118,7 @@ class Command(BaseCommand):
             count_obj.count = count
         models.Count.objects.bulk_create(
             counts,
+            update_conflicts=True,
             unique_fields=["host", "date", "metric", "value"],
             update_fields=["count"],
         )
