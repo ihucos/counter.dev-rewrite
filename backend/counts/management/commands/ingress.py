@@ -87,7 +87,6 @@ class Command(BaseCommand):
                 vals.remove(v)
 
         # bulk create hosts with update_conflcits
-        print(vals)
         hosts = Host.objects.bulk_create(
             [Host(user=user_map[v["user"]], name=v["host"]) for v in vals],
             update_conflicts=True,

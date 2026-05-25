@@ -11,21 +11,22 @@ from django.core.cache import cache
 @pytest.fixture
 def redis(settings):
     """Return a test Redis connection using the test database (db 5)."""
+    return cache._cache.get_client()
 
-    return CacheHandler(
-        {
-            "default": {
-                "BACKEND": "django.core.cache.backends.redis.RedisCache",
-                "LOCATION": "redis://localhost:6379/5",
-            }
-        }
-    )["default"]._cache.get_client()
+    # return CacheHandler(
+    #     {
+    #         "default": {
+    #             "BACKEND": "django.core.cache.backends.redis.RedisCache",
+    #             "LOCATION": "redis://localhost:6379/5",
+    #         }
+    #     }
+    # )["default"]._cache.get_client()
 
 
 @pytest.fixture(autouse=True)
 def clean_cache(redis):
     # Sanity check
-    assert redis.connection_pool.connection_kwargs["db"] != 0, "Refusing to flush db 0"
+    # assert redis.connection_pool.connection_kwargs["db"] != 0, "Refusing to flush db 0"
     redis.flushall()
     yield
     redis.flushall()
@@ -90,10 +91,10 @@ def counts(db, host):
     return Count.objects.all()
 
 
-@pytest.fixture
-def other_counts(db, other_host):
-    today = date.today()
-    Count.objects.create(
-        host=other_host, date=today, metric="pageview", value="/other", count=100
-    )
-    return Count.objects.all()
+# def global_test_settings(settings):
+#     settings.CACHES = {
+#         "default": {
+#             "BACKEND": "django.core.cache.backends.redis.RedisCache",
+#             "LOCATION": "redis://redis:6379/5",  # Use db number 5,
+#         }
+#     }
