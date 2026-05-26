@@ -142,24 +142,25 @@ class Command(BaseCommand):
         records = []
         for v in vals:
             host = hosts_map[(user_map[v["user"]].id, v["host"])]
-            records.append((host.id, v["metric"], v["date"], v["value"], v["count"]))
+            records.extend((host.id, v["metric"], v["date"], v["value"], v["count"]))
 
         # Use a single UPDATE ... FROM (VALUES ...) query to batch increment all counts
-        value_expressions = ", ".join("(%s, %s, %s::date, %s, %s)" for _ in records)
-        flat_values = []
-        for r in records:
-            flat_values.extend(r)
 
         with connection.cursor() as cursor:
             cursor.execute(
-                f"""
-                UPDATE {Count._meta.db_table}
+                """
+                UPDATE {table}
                 SET count = count + v.incr
                 FROM (VALUES {value_expressions}) AS v(host_id, metric, date, value, incr)
-                WHERE {Count._meta.db_table}.host_id = v.host_id
-                  AND {Count._meta.db_table}.metric = v.metric
-                  AND {Count._meta.db_table}.date = v.date
-                  AND {Count._meta.db_table}.value = v.value
-                """,
-                flat_values,
+                WHERE {table}.host_id = v.host_id
+                  AND {table}.metric = v.metric
+                  AND {table}.date = v.date
+                  AND {table}.value = v.value
+                """.format(
+                    table=Count._meta.db_table,
+                    value_expressions=", ".join(
+                        "(%s, %s, %s::date, %s, %s)" for _ in vals
+                    ),
+                ),
+                records,
             )

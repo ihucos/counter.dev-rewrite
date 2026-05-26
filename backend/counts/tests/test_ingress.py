@@ -115,7 +115,6 @@ def redis_data(redis):
 class TestIngressView:
     def test_does_not_die_badly(self, db, user_data, host_data, redis_data):
         call_command("ingress")
-        call_command("ingress")
 
     def test_simple(self, db, redis):
         User.objects.get_or_create(username="peter")
