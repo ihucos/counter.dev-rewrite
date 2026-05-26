@@ -37,7 +37,7 @@ class Command(BaseCommand):
         return host, user, metric, date
 
     def _pop_keys(self, keys) -> dict:
-        pipeline = self.redis.pipeline()
+        pipeline = self.redis.pipeline(transaction=True)
         for key in keys:
             pipeline.hgetall(key)
         for key in keys:
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             ],
             update_conflicts=True,
             unique_fields=["user_id", "name"],
-            update_fields=["user_id", "name"],
+            update_fields=["name"],
         )
         # Frozendict!
         hosts_map = {(i.user_id, i.name): i for i in hosts}
