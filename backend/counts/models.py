@@ -42,4 +42,4 @@ class Count(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.host_id} {self.date} {self.metric}={self.value} ({self.count})"
+        return f"{self.host.user.username} {self.host.name} {self.date} {self.metric} {self.value} ({self.count})"

@@ -125,14 +125,17 @@ class Command(BaseCommand):
                 )
                 for v in vals
             ],
-            update_conflicts=True,
-            unique_fields=["host", "date", "metric", "value"],
-            update_fields=["host", "date", "metric", "value"],
+            ignore_conflicts = True
+            # update_conflicts=True,
+            # unique_fields=["host", "date", "metric", "value"],
+            # update_fields=["host"],
         )
 
         # Add the counts from redis to the counts loaded into the models
+        # breakpoint()
+        breakpoint()
         for count_obj, count in zip(counts, (i["count"] for i in vals)):
-            count_obj.count = count
+            count_obj.count += int(count)
         models.Count.objects.bulk_create(
             counts,
             update_conflicts=True,
