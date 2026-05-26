@@ -139,13 +139,7 @@ class Command(BaseCommand):
         # We build a VALUES table and join to update counts in one query.
         from django.db import connection
 
-        records = []
-        for v in vals:
-            host = hosts_map[(user_map[v["user"]].id, v["host"])]
-            records.extend((host.id, v["metric"], v["date"], v["value"], v["count"]))
-
         # Use a single UPDATE ... FROM (VALUES ...) query to batch increment all counts
-
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -162,5 +156,27 @@ class Command(BaseCommand):
                         "(%s, %s, %s::date, %s, %s)" for _ in vals
                     ),
                 ),
-                records,
+                flatten_list(
+                    (
+                        hosts_map[
+                            (
+                                user_map[v["user"]].id,
+                                v["host"],
+                            )
+                        ].id,
+                        v["metric"],
+                        v["date"],
+                        v["value"],
+                        v["count"],
+                    )
+                    for v in vals
+                ),
             )
+
+
+def flatten_list(lst):
+    r = []
+    for sublst in lst:
+        for i in sublst:
+            r.append(i)
+    return r
