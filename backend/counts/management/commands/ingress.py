@@ -3,6 +3,7 @@ from counts.models import Count, Host
 from time import sleep
 from django.core.cache import cache
 from django.db.models.query_utils import Q
+from django.db import connection
 
 from ... import models
 from accounts.models import User
@@ -112,45 +113,20 @@ class Command(BaseCommand):
                 )
             ],
             update_conflicts=True,
-            unique_fields=["user", "name"],
-            update_fields=["user", "name"],
+            unique_fields=["user_id", "name"],
+            update_fields=["user_id", "name"],
         )
         # Frozendict!
         hosts_map = {(i.user_id, i.name): i for i in hosts}
         print(hosts)
 
-        # First pass: create any new count records with count=0.
-        # Existing records are ignored (ignore_conflicts=True).
-        # This ensures every unique (host, date, metric, value) combo exists.
-        models.Count.objects.bulk_create(
-            [
-                models.Count(
-                    host=hosts_map[(user_map[r["user"]].id, r["host"])],
-                    metric=r["metric"],
-                    date=r["date"],
-                    value=r["value"],
-                    count=0,
-                )
-                for r in records
-            ],
-            ignore_conflicts=True,
-        )
-
-        # Second pass: use a single batched UPDATE via raw SQL for efficiency.
-        # We build a VALUES table and join to update counts in one query.
-        from django.db import connection
-
-        # Use a single UPDATE ... FROM (VALUES ...) query to batch increment all counts
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                UPDATE {table}
-                SET count = count + r.incr
-                FROM (VALUES {value_expressions}) AS r(host_id, metric, date, value, incr)
-                WHERE {table}.host_id = r.host_id
-                  AND {table}.metric = r.metric
-                  AND {table}.date = r.date
-                  AND {table}.value = r.value
+                INSERT INTO {table} (host_id, metric, date, value, count)
+                VALUES {value_expressions}
+                ON CONFLICT (host_id, metric, date, value) 
+                DO UPDATE SET count = {table}.count + EXCLUDED.count
                 """.format(
                     table=Count._meta.db_table,
                     value_expressions=", ".join(
