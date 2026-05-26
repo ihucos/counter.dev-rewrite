@@ -123,12 +123,16 @@ class TestIngressView:
             "v:website.com,peter,loc,2026-05-21",
             mapping={"/": 1},
         )
+        redis.hset(
+            "v:example.com,usernotindb,loc,2026-05-21",
+            mapping={"/page": 2},
+        )
         call_command("ingress")
         count = models.Count.objects.get()
         assert count.host.name == "website.com"
         assert count.host.user.username == "peter"
         assert count.metric == "loc"
-        # assert count.value == b"/" # BUG in code
+        assert count.value == "/"
         assert count.count == 1
 
         redis.hset(
@@ -138,3 +142,4 @@ class TestIngressView:
         call_command("ingress")
         count = models.Count.objects.get()
         assert count.count == 2
+        assert User.objects.get().username == "peter", "Only peter user is created"

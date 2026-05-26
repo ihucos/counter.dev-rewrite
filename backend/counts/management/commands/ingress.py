@@ -52,21 +52,23 @@ class Command(BaseCommand):
             self._parse_key(key): val for (key, val) in keys_with_vals.items()
         }
 
-        # TODO: dict frozendict FTW!!!
-        self._save_values_batch(
-            [
-                {
-                    "host": host,
-                    "user": user,
-                    "metric": metric,
-                    "date": date,
-                    "value": value,
-                    "count": count,
-                }
-                for ((host, user, metric, date), vals) in parsed_keys_with_vals.items()
-                for (value, count) in vals.items()
-            ]
-        )
+        vals = []
+        for (host, user, metric, date), hvals in parsed_keys_with_vals.items():
+            for value, count in hvals.items():
+                vals.append(
+                    {
+                        "host": host.decode() if isinstance(host, bytes) else host,
+                        "user": user.decode() if isinstance(user, bytes) else user,
+                        "metric": metric.decode()
+                        if isinstance(metric, bytes)
+                        else metric,
+                        "date": date.decode() if isinstance(date, bytes) else date,
+                        "value": value.decode() if isinstance(value, bytes) else value,
+                        "count": int(count),
+                    }
+                )
+
+        self._save_values_batch(vals)
 
     def handle(self, *args, **options):
         forever = options["forever"]
@@ -95,7 +97,10 @@ class Command(BaseCommand):
         # Remove users not in database
         vals = [val for val in vals if val["user"] in user_map]
 
-        # Create or "get" (via update_conclits" hack) hosts
+        if not vals:
+            return
+
+        # Create or "get" (via update_conflicts hack) hosts
         hosts = Host.objects.bulk_create(
             [
                 models.Host(**i)
@@ -113,8 +118,10 @@ class Command(BaseCommand):
         # Frozendict!
         hosts_map = {(i.user_id, i.name): i for i in hosts}
 
-        # Create or "get" (via update_conclits" hack) counts
-        counts = models.Count.objects.bulk_create(
+        # First pass: create any new count records with count=0.
+        # Existing records are ignored (ignore_conflicts=True).
+        # This ensures every unique (host, date, metric, value) combo exists.
+        models.Count.objects.bulk_create(
             [
                 models.Count(
                     host=hosts_map[(user_map[v["user"]].id, v["host"])],
@@ -125,20 +132,34 @@ class Command(BaseCommand):
                 )
                 for v in vals
             ],
-            ignore_conflicts = True
-            # update_conflicts=True,
-            # unique_fields=["host", "date", "metric", "value"],
-            # update_fields=["host"],
+            ignore_conflicts=True,
         )
 
-        # Add the counts from redis to the counts loaded into the models
-        # breakpoint()
-        breakpoint()
-        for count_obj, count in zip(counts, (i["count"] for i in vals)):
-            count_obj.count += int(count)
-        models.Count.objects.bulk_create(
-            counts,
-            update_conflicts=True,
-            unique_fields=["host", "date", "metric", "value"],
-            update_fields=["count"],
-        )
+        # Second pass: use a single batched UPDATE via raw SQL for efficiency.
+        # We build a VALUES table and join to update counts in one query.
+        from django.db import connection
+
+        records = []
+        for v in vals:
+            host = hosts_map[(user_map[v["user"]].id, v["host"])]
+            records.append((host.id, v["metric"], v["date"], v["value"], v["count"]))
+
+        # Use a single UPDATE ... FROM (VALUES ...) query to batch increment all counts
+        value_expressions = ", ".join("(%s, %s, %s::date, %s, %s)" for _ in records)
+        flat_values = []
+        for r in records:
+            flat_values.extend(r)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                UPDATE {Count._meta.db_table}
+                SET count = count + v.incr
+                FROM (VALUES {value_expressions}) AS v(host_id, metric, date, value, incr)
+                WHERE {Count._meta.db_table}.host_id = v.host_id
+                  AND {Count._meta.db_table}.metric = v.metric
+                  AND {Count._meta.db_table}.date = v.date
+                  AND {Count._meta.db_table}.value = v.value
+                """,
+                flat_values,
+            )
