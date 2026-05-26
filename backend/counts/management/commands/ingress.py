@@ -52,10 +52,10 @@ class Command(BaseCommand):
             self._parse_key(key): val for (key, val) in keys_with_vals.items()
         }
 
-        vals = []
+        records = []
         for (host, user, metric, date), hvals in parsed_keys_with_vals.items():
             for value, count in hvals.items():
-                vals.append(
+                records.append(
                     {
                         "host": host.decode() if isinstance(host, bytes) else host,
                         "user": user.decode() if isinstance(user, bytes) else user,
@@ -68,7 +68,7 @@ class Command(BaseCommand):
                     }
                 )
 
-        self._save_values_batch(vals)
+        self._save_values_batch(records)
 
     def handle(self, *args, **options):
         forever = options["forever"]
@@ -82,22 +82,22 @@ class Command(BaseCommand):
             if not forever:
                 break
 
-    def _save_values_batch(self, vals: list[dict]):
+    def _save_values_batch(self, records: list[dict]):
         """
         Increment values batch into postgres
         """
-        vals = list(vals)
+        records = list(records)
 
         # Map users specified in redis to database users
         user_map = {
-            **User.objects.in_bulk([i["user"] for i in vals], field_name="id"),
-            **User.objects.in_bulk([i["user"] for i in vals], field_name="username"),
+            **User.objects.in_bulk([i["user"] for i in records], field_name="id"),
+            **User.objects.in_bulk([i["user"] for i in records], field_name="username"),
         }
 
         # Remove users not in database
-        vals = [val for val in vals if val["user"] in user_map]
+        records = [r for r in records if r["user"] in user_map]
 
-        if not vals:
+        if not records:
             return
 
         # Create or "get" (via update_conflicts hack) hosts
@@ -106,8 +106,8 @@ class Command(BaseCommand):
                 models.Host(**i)
                 for i in unique_dicts(
                     [
-                        {"user_id": user_map[v["user"]].id, "name": v["host"]}
-                        for v in vals
+                        {"user_id": user_map[r["user"]].id, "name": r["host"]}
+                        for r in records
                     ]
                 )
             ],
@@ -117,6 +117,7 @@ class Command(BaseCommand):
         )
         # Frozendict!
         hosts_map = {(i.user_id, i.name): i for i in hosts}
+        print(hosts)
 
         # First pass: create any new count records with count=0.
         # Existing records are ignored (ignore_conflicts=True).
@@ -124,13 +125,13 @@ class Command(BaseCommand):
         models.Count.objects.bulk_create(
             [
                 models.Count(
-                    host=hosts_map[(user_map[v["user"]].id, v["host"])],
-                    metric=v["metric"],
-                    date=v["date"],
-                    value=v["value"],
+                    host=hosts_map[(user_map[r["user"]].id, r["host"])],
+                    metric=r["metric"],
+                    date=r["date"],
+                    value=r["value"],
                     count=0,
                 )
-                for v in vals
+                for r in records
             ],
             ignore_conflicts=True,
         )
@@ -144,39 +145,27 @@ class Command(BaseCommand):
             cursor.execute(
                 """
                 UPDATE {table}
-                SET count = count + v.incr
-                FROM (VALUES {value_expressions}) AS v(host_id, metric, date, value, incr)
-                WHERE {table}.host_id = v.host_id
-                  AND {table}.metric = v.metric
-                  AND {table}.date = v.date
-                  AND {table}.value = v.value
+                SET count = count + r.incr
+                FROM (VALUES {value_expressions}) AS r(host_id, metric, date, value, incr)
+                WHERE {table}.host_id = r.host_id
+                  AND {table}.metric = r.metric
+                  AND {table}.date = r.date
+                  AND {table}.value = r.value
                 """.format(
                     table=Count._meta.db_table,
                     value_expressions=", ".join(
-                        "(%s, %s, %s::date, %s, %s)" for _ in vals
+                        "(%s, %s, %s::date, %s, %s)" for _ in records
                     ),
                 ),
-                flatten_list(
-                    (
-                        hosts_map[
-                            (
-                                user_map[v["user"]].id,
-                                v["host"],
-                            )
-                        ].id,
-                        v["metric"],
-                        v["date"],
-                        v["value"],
-                        v["count"],
+                [
+                    val
+                    for r in records
+                    for val in (
+                        hosts_map[(user_map[r["user"]].id, r["host"])].id,
+                        r["metric"],
+                        r["date"],
+                        r["value"],
+                        r["count"],
                     )
-                    for v in vals
-                ),
+                ],
             )
-
-
-def flatten_list(lst):
-    r = []
-    for sublst in lst:
-        for i in sublst:
-            r.append(i)
-    return r
