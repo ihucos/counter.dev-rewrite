@@ -1,3 +1,4 @@
+import signal
 from time import sleep
 from urllib.parse import unquote
 
@@ -18,8 +19,19 @@ class BadKeyError(ValueError):
 class Command(BaseCommand):
     help = "Sync data into the Core app, creating or updating Count records."
 
-    def __init__(self):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.redis = cache._cache.get_client()
+        self.kill_now = False
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        self.stdout.write(
+            self.style.WARNING(f"Received signal {signum}. Finishing current iteration...")
+        )
+        self.kill_now = True
 
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
@@ -46,6 +58,13 @@ class Command(BaseCommand):
 
             if cursor == 0 and forever and sleep_secs > 0:
                 sleep(sleep_secs)
+
+            if self.kill_now:
+                break
+
+        self.stdout.write(
+            self.style.SUCCESS("Cleaned up resources. Exiting gracefully now. Goodbye!")
+        )
 
     def _parse_key(self, key):
         try:
