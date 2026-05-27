@@ -78,14 +78,6 @@ class PrefsSerializer(serializers.Serializer):
     prefs = serializers.DictField(child=serializers.CharField())
 
 
-class AllowedDomainsSerializer(serializers.Serializer):
-    allowed_domains = serializers.ListField(child=serializers.CharField())
-
-
-class FilterAllowedDomainsSerializer(serializers.Serializer):
-    filter_allowed_domains = serializers.BooleanField()
-
-
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 

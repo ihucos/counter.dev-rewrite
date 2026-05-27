@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db import models
-from django.db.models.query import QuerySet
 
 
 class Host(models.Model):
@@ -17,12 +16,7 @@ class Host(models.Model):
         return f"{self.name} ({self.user_id})"
 
 
-class CountQuerySet(QuerySet):
-    pass
-
-
 class Count(models.Model):
-    objects = CountQuerySet.as_manager()
     host = models.ForeignKey(
         Host,
         on_delete=models.CASCADE,
