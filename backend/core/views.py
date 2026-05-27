@@ -1,24 +1,19 @@
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
 
 from django.db.models import Sum
 from rest_framework.generics import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.decorators import (
     api_view,
-    authentication_classes,
     permission_classes,
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.models import User
 
 from .models import Count, Host
-from .permissions import IngressSecretAuthentication
 from .serializers import (
     HostSerializer,
-    IngressRequestSerializer,
     QueryRequestSerializer,
 )
 
@@ -55,24 +50,3 @@ def query(request):
         result[row["category"]][row["item"]] = row["total"]
 
     return Response(result)
-
-
-def _user_today(user: User) -> date:
-    """Return today's date in the user's timezone (UTC offset hours)."""
-    tz = timezone(timedelta(hours=user.timezone or 0))
-    return datetime.now(tz).date()
-
-
-@api_view(["POST"])
-@authentication_classes([IngressSecretAuthentication])
-def ingress(request):
-    serializer = IngressRequestSerializer(data=request.data, many=True)
-    serializer.is_valid(raise_exception=True)
-    entries = serializer.validated_data
-
-    # Create host objects
-    host_user_pairs = [(e["user"], e["host"]) for e in entries]
-    Host.objects.bulk_create(
-        [Host(user_id=u, name=h) for u, h in host_user_pairs],
-        ignore_conflicts=True,
-    )
