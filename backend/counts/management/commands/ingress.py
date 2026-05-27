@@ -21,14 +21,28 @@ class Command(BaseCommand):
 
     def __init__(self):
         self.redis = cache._cache.get_client()
+        self.redis.connection_pool.connection_kwargs["decode_responses"] = True
 
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
+        parser.add_argument("--batch", type=int, default=1000)
+
+    def handle(self, *args, **options):
+        forever = options["forever"]
+        cursor = 0
+        while True:
+            cursor, keys = self.redis.scan(
+                cursor=cursor, match="v:*,*,*,*-*-*", count=options["batch"]
+            )
+            self._handle_keys_batch(keys)
+
+            if cursor == 0 and not forever:
+                break
 
     def _parse_key(self, key):
         if not key.startswith("v:"):
             raise ValueError("bad key")
-        key = key[len(b"v:") :]
+        key = key[len("v:") :]
         try:
             host, user, metric, date = key.split(",")
         except ValueError:
@@ -48,40 +62,21 @@ class Command(BaseCommand):
         # This can fail
         keys = [i.decode() for i in keys]
 
-        keys_with_vals = self._pop_keys(keys)
-        parsed_keys_with_vals = {
-            self._parse_key(key): val for (key, val) in keys_with_vals.items()
-        }
-
         records = []
-        for (host, user, metric, date), hvals in parsed_keys_with_vals.items():
-            for value, count in hvals.items():
+        for key, hval in self._pop_keys(keys).items():
+            host, user, metric, date = self._parse_key(key)
+            for value, count in hval.items():
                 records.append(
                     {
-                        "host": host.decode() if isinstance(host, bytes) else host,
-                        "user": user.decode() if isinstance(user, bytes) else user,
-                        "metric": metric.decode()
-                        if isinstance(metric, bytes)
-                        else metric,
-                        "date": date.decode() if isinstance(date, bytes) else date,
-                        "value": value.decode() if isinstance(value, bytes) else value,
+                        "host": host,
+                        "user": user,
+                        "metric": metric,
+                        "date": date,
+                        "value": value.decode(),
                         "count": int(count),
                     }
                 )
-
         self._save_values_batch(records)
-
-    def handle(self, *args, **options):
-        forever = options["forever"]
-        cursor = 0
-        while True:
-            cursor, keys = self.redis.scan(
-                cursor=cursor, match="v:*,*,*,*-*-*", count=10
-            )
-            self._handle_keys_batch(keys)
-
-            if not forever:
-                break
 
     def _save_values_batch(self, records: list[dict]):
         """
