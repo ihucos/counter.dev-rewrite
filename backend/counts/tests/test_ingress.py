@@ -6,19 +6,6 @@ from .. import models
 from ..management.commands.ingress import BadKeyError, Command
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _set_redis_key(redis, key, mapping):
-    """Helper to set a Redis key with a mapping (hash)."""
-    redis.hset(key, mapping=mapping)
-
-
-# ---------------------------------------------------------------------------
-# Fixtures – data
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def user_data():
     """Create users referenced in the redis_data fixture."""
@@ -53,7 +40,7 @@ def redis_data(redis):
         "v:,,,": {"x": 1},
     }
     for key, mapping in entries.items():
-        _set_redis_key(redis, key, mapping)
+        redis.hset(key, mapping=mapping)
     return redis
 
 
@@ -127,7 +114,7 @@ class TestIngressCommand:
 
     def test_no_count_objects_created_when_no_users_exist(self, db, redis):
         """If no users exist, valid keys produce no Count rows."""
-        _set_redis_key(redis, "v:site.com,nobody,loc,2026-05-21", {"/": 5})
+        redis.hset("v:site.com,nobody,loc,2026-05-21", mapping={"/": 5})
         call_command("ingress")
         assert models.Count.objects.count() == 0
 
@@ -136,8 +123,8 @@ class TestIngressCommand:
     def test_simple(self, db, redis):
         """A known user + a valid key creates one Count."""
         User.objects.get_or_create(username="peter")
-        _set_redis_key(redis, "v:website.com,peter,loc,2026-05-21", {"/": 1})
-        _set_redis_key(redis, "v:example.com,usernotindb,loc,2026-05-21", {"/page": 2})
+        redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
+        redis.hset("v:example.com,usernotindb,loc,2026-05-21", mapping={"/page": 2})
 
         call_command("ingress")
 
@@ -153,10 +140,9 @@ class TestIngressCommand:
     def test_multiple_values_per_key(self, db, redis):
         """A single Redis hash with several fields yields multiple Count rows."""
         User.objects.get_or_create(username="alice")
-        _set_redis_key(
-            redis,
+        redis.hset(
             "v:mysite.com,alice,pageview,2026-06-01",
-            {"/": 10, "/about": 5, "/contact": 3},
+            mapping={"/": 10, "/about": 5, "/contact": 3},
         )
         call_command("ingress")
         assert models.Count.objects.count() == 3
@@ -165,11 +151,11 @@ class TestIngressCommand:
     def test_incremental_ingress(self, db, redis):
         """Running ingress again with the same key increments the count."""
         User.objects.get_or_create(username="peter")
-        _set_redis_key(redis, "v:website.com,peter,loc,2026-05-21", {"/": 1})
+        redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
         call_command("ingress")
         assert models.Count.objects.get().count == 1
 
-        _set_redis_key(redis, "v:website.com,peter,loc,2026-05-21", {"/": 1})
+        redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
         call_command("ingress")
         assert models.Count.objects.get().count == 2
 
@@ -178,7 +164,7 @@ class TestIngressCommand:
         User.objects.get_or_create(username="charlie")
         assert models.Host.objects.count() == 0
 
-        _set_redis_key(redis, "v:newhost.com,charlie,loc,2026-07-01", {"/": 1})
+        redis.hset("v:newhost.com,charlie,loc,2026-07-01", mapping={"/": 1})
         call_command("ingress")
 
         assert models.Host.objects.count() == 1
@@ -192,7 +178,7 @@ class TestIngressCommand:
         models.Host.objects.create(name="dave.com", user=user)
         assert models.Host.objects.count() == 1
 
-        _set_redis_key(redis, "v:dave.com,dave,loc,2026-07-01", {"/": 1})
+        redis.hset("v:dave.com,dave,loc,2026-07-01", mapping={"/": 1})
         call_command("ingress")
 
         assert models.Host.objects.count() == 1
@@ -225,9 +211,9 @@ class TestIngressCommand:
 
     def test_malformed_keys_skipped(self, db, redis):
         """Keys that don't match the expected schema are silently ignored."""
-        _set_redis_key(redis, "v:missingfield,user,loc", {"/": 1})
-        _set_redis_key(redis, "v:no_prefix", {"/": 1})
-        _set_redis_key(redis, "v:,,,", {"x": 1})
+        redis.hset("v:missingfield,user,loc", mapping={"/": 1})
+        redis.hset("v:no_prefix", mapping={"/": 1})
+        redis.hset("v:,,,", mapping={"x": 1})
 
         call_command("ingress")
         assert models.Count.objects.count() == 0
@@ -240,7 +226,7 @@ class TestIngressCommand:
     def test_idempotent_when_no_new_data(self, db, redis):
         """Running ingress when no new keys exist changes nothing."""
         User.objects.get_or_create(username="alice")
-        _set_redis_key(redis, "v:site.com,alice,loc,2026-06-01", {"/": 5})
+        redis.hset("v:site.com,alice,loc,2026-06-01", mapping={"/": 5})
         call_command("ingress")
         assert models.Count.objects.get().count == 5
         call_command("ingress")
