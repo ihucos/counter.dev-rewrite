@@ -28,8 +28,8 @@ class Count(models.Model):
         on_delete=models.CASCADE,
     )
     date = models.DateField()
-    category = models.CharField(max_length=64)
-    item = models.CharField(max_length=255)
+    category = models.CharField(max_length=64)  # e.g. "Browser"
+    item = models.CharField(max_length=255)  # e.g. "Firefox"
     total = models.BigIntegerField(default=0)
 
     class Meta:
