@@ -12,7 +12,7 @@ from rest_framework.decorators import (
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from accounts.models import User
+from users.models import User
 
 from .models import Count, Host
 from .permissions import IngressSecretAuthentication

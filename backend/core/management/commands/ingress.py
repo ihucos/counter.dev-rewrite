@@ -5,8 +5,8 @@ from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from accounts.models import User
-from counts.models import Count, Host
+from users.models import User
+from core.models import Count, Host
 
 
 class BadKeyError(ValueError):
@@ -16,7 +16,7 @@ class BadKeyError(ValueError):
 
 
 class Command(BaseCommand):
-    help = "Ingress data into the Counts app, creating or updating Count records."
+    help = "Ingress data into the Core app, creating or updating Count records."
 
     def __init__(self):
         self.redis = cache._cache.get_client()

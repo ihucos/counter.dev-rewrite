@@ -29,8 +29,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
-    "accounts",
-    "counts",
+    "users",
+    "core",
 ]
 
 MIDDLEWARE = [
@@ -81,7 +81,7 @@ CACHES = {
     }
 }
 
-AUTH_USER_MODEL = "accounts.User"
+AUTH_USER_MODEL = "users.User"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

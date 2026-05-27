@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from django.urls import reverse
 from rest_framework import status
 
-from counts.models import Count
+from core.models import Count
 
 
 class TestQueryView:
@@ -20,7 +20,7 @@ class TestQueryView:
         assert response.data["click"]["button1"] == 2
 
     def test_user_cannot_query_other_users_data(
-        self, api_client, user, host, other_user, other_host, other_counts
+        self, api_client, user, host, other_user, other_host, counts
     ):
         api_client.force_authenticate(user=user)
         url = reverse("query")

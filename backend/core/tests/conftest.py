@@ -3,8 +3,8 @@ from datetime import date, timedelta
 from rest_framework.test import APIClient
 from django.core.cache import CacheHandler
 
-from accounts.models import User
-from counts.models import Count, Host
+from users.models import User
+from core.models import Count, Host
 from django.core.cache import cache
 
 
@@ -13,29 +13,12 @@ def redis(settings):
     """Return a test Redis connection using the test database (db 5)."""
     return cache._cache.get_client()
 
-    # return CacheHandler(
-    #     {
-    #         "default": {
-    #             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-    #             "LOCATION": "redis://localhost:6379/5",
-    #         }
-    #     }
-    # )["default"]._cache.get_client()
-
 
 @pytest.fixture(autouse=True)
 def clean_cache(redis):
-    # Sanity check
-    # assert redis.connection_pool.connection_kwargs["db"] != 0, "Refusing to flush db 0"
     redis.flushall()
     yield
     redis.flushall()
-
-
-# @pytest.fixture(autouse=True)
-# def global_test_settings(settings):
-#     settings.CACHES["default"]["LOCATION"] += "0"
-#     # "LOCATION": "redis://redis:6379/5",  # Use db number 5,
 
 
 @pytest.fixture
@@ -89,12 +72,3 @@ def counts(db, host):
         host=host, date=today, metric="click", value="button1", count=2
     )
     return Count.objects.all()
-
-
-# def global_test_settings(settings):
-#     settings.CACHES = {
-#         "default": {
-#             "BACKEND": "django.core.cache.backends.redis.RedisCache",
-#             "LOCATION": "redis://redis:6379/5",  # Use db number 5,
-#         }
-#     }

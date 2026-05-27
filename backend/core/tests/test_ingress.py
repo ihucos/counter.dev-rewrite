@@ -1,7 +1,7 @@
 from django.core.management import call_command
 import pytest
 
-from accounts.models import User
+from users.models import User
 from .. import models
 from ..management.commands.ingress import BadKeyError, Command
 

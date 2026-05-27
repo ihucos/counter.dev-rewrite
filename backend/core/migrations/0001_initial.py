@@ -33,10 +33,10 @@ class Migration(migrations.Migration):
                 ('metric', models.CharField(max_length=64)),
                 ('value', models.CharField(max_length=255)),
                 ('count', models.BigIntegerField(default=0)),
-                ('host', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='counts', to='counts.host')),
+                ('host', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='counts', to='core.host')),
             ],
             options={
-                'indexes': [models.Index(fields=['host', 'date'], name='counts_coun_host_id_efbcd1_idx'), models.Index(fields=['host', 'metric'], name='counts_coun_host_id_81de43_idx')],
+                'indexes': [models.Index(fields=['host', 'date'], name='core_coun_host_id_efbcd1_idx'), models.Index(fields=['host', 'metric'], name='core_coun_host_id_81de43_idx')],
                 'unique_together': {('host', 'date', 'metric', 'value')},
             },
         ),

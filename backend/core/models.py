@@ -19,8 +19,6 @@ class Host(models.Model):
 
 class CountQuerySet(QuerySet):
     pass
-    # def as_data(self):
-    #     assert 0, self.values_list("host__user", "host__name", ")
 
 
 class Count(models.Model):
