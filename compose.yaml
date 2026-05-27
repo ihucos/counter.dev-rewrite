@@ -22,6 +22,29 @@ services:
         - action: rebuild
           path: Dockerfile
 
+  sync:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    command: ["uv", "run", "python", "manage.py", "sync", "--forever", "--sleep", "1"]
+    develop:
+      watch:
+        - action: sync
+          path: backend/
+          target: /app
+          ignore:
+            - .venv/
+
+        - action: rebuild
+          path: backend/pyproject.toml
+
+        - action: rebuild
+          path: Dockerfile
+
   redis:
     build:
       context: ./redis
