@@ -12,14 +12,9 @@ from accounts.models import User
 
 
 class BadKeyError(ValueError):
+    """Raised when a Redis key does not match the expected ingestion schema."""
+
     pass
-
-
-def unique_dicts(lst: list[dict]) -> list[dict]:
-    unique_list = set()
-    for dic in lst:
-        unique_list.add(tuple(sorted(dic.items())))
-    return [dict(i) for i in unique_list]
 
 
 class Command(BaseCommand):
@@ -30,14 +25,14 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
-        parser.add_argument("--batch", type=int, default=1000)
+        parser.add_argument("--batch-size", type=int, default=1000)
 
     def handle(self, *args, **options):
         forever = options["forever"]
         cursor = 0
         while True:
             cursor, keys = self.redis.scan(
-                cursor=cursor, match="v:*,*,*,*-*-*", count=options["batch"]
+                cursor=cursor, match="v:*,*,*,*-*-*", count=options["batch_size"]
             )
             self._handle_keys_batch(keys)
 
@@ -71,7 +66,11 @@ class Command(BaseCommand):
 
         records = []
         for key, hval in self._pop_keys(keys).items():
-            host, user, metric, date = self._parse_key(key)
+            try:
+                host, user, metric, date = self._parse_key(key)
+            except BadKeyError:
+                print(f"Bad key: {key}")
+                continue
             for value, count in hval.items():
                 records.append(
                     {
@@ -98,7 +97,6 @@ class Command(BaseCommand):
             **User.objects.in_bulk(user_identifiers, field_name="username"),
         }
 
-        # Safely filter and inject user IDs without altering lists during iteration
         valid_records = []
         for r in records:
             user_obj = user_map.get(r["user"])
