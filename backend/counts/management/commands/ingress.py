@@ -1,3 +1,5 @@
+from urllib.parse import unquote
+
 from django.core.management.base import BaseCommand, CommandError
 from counts.models import Count, Host
 from time import sleep
@@ -7,6 +9,10 @@ from django.db import connection
 
 from ... import models
 from accounts.models import User
+
+
+class BadKeyError(ValueError):
+    pass
 
 
 def unique_dicts(lst: list[dict]) -> list[dict]:
@@ -21,7 +27,6 @@ class Command(BaseCommand):
 
     def __init__(self):
         self.redis = cache._cache.get_client()
-        self.redis.connection_pool.connection_kwargs["decode_responses"] = True
 
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
@@ -40,15 +45,18 @@ class Command(BaseCommand):
                 break
 
     def _parse_key(self, key):
+        try:
+            key = key.decode()
+        except UnicodeDecodeError:
+            raise BadKeyError()
         if not key.startswith("v:"):
-            raise ValueError("bad key")
+            raise BadKeyError()
         key = key[len("v:") :]
         try:
             host, user, metric, date = key.split(",")
         except ValueError:
-            raise ValueError("bad key")
-        # urldecode!!
-        return host, user, metric, date
+            raise BadKeyError()
+        return unquote(host), unquote(user), unquote(metric), unquote(date)
 
     def _pop_keys(self, keys) -> dict:
         pipeline = self.redis.pipeline(transaction=True)
@@ -60,7 +68,6 @@ class Command(BaseCommand):
 
     def _handle_keys_batch(self, keys):
         # This can fail
-        keys = [i.decode() for i in keys]
 
         records = []
         for key, hval in self._pop_keys(keys).items():
@@ -80,40 +87,39 @@ class Command(BaseCommand):
 
     def _save_values_batch(self, records: list[dict]):
         """
-        Increment values batch into postgres
+        Increment or create the records into postgres
         """
         records = list(records)
 
         # Map users specified in redis to database users
+        user_identifiers = {r["user"] for r in records}
         user_map = {
-            **User.objects.in_bulk([i["user"] for i in records], field_name="id"),
-            **User.objects.in_bulk([i["user"] for i in records], field_name="username"),
+            **User.objects.in_bulk(user_identifiers, field_name="id"),
+            **User.objects.in_bulk(user_identifiers, field_name="username"),
         }
 
-        # Remove users not in database
-        records = [r for r in records if r["user"] in user_map]
+        # Safely filter and inject user IDs without altering lists during iteration
+        valid_records = []
+        for r in records:
+            user_obj = user_map.get(r["user"])
+            if user_obj:
+                r["user_id"] = user_obj.id
+                valid_records.append(r)
+        del records
 
-        if not records:
+        if not valid_records:
             return
 
-        # Create or "get" (via update_conflicts hack) hosts
         hosts = Host.objects.bulk_create(
-            [
-                models.Host(**i)
-                for i in unique_dicts(
-                    [
-                        {"user_id": user_map[r["user"]].id, "name": r["host"]}
-                        for r in records
-                    ]
-                )
-            ],
+            self._get_unique_hosts(valid_records),
             update_conflicts=True,
             unique_fields=["user_id", "name"],
             update_fields=["name"],
         )
-        # Frozendict!
-        hosts_map = {(i.user_id, i.name): i for i in hosts}
-        print(hosts)
+
+        host_map = {(h.user_id, h.name): h.id for h in hosts}
+        for r in valid_records:
+            r["host_id"] = host_map.get((r["user_id"], r["host"]))
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -125,14 +131,14 @@ class Command(BaseCommand):
                 """.format(
                     table=Count._meta.db_table,
                     value_expressions=", ".join(
-                        "(%s, %s, %s::date, %s, %s)" for _ in records
+                        "(%s, %s, %s::date, %s, %s)" for _ in valid_records
                     ),
                 ),
                 [
                     val
-                    for r in records
+                    for r in valid_records
                     for val in (
-                        hosts_map[(user_map[r["user"]].id, r["host"])].id,
+                        r["host_id"],
                         r["metric"],
                         r["date"],
                         r["value"],
@@ -140,3 +146,14 @@ class Command(BaseCommand):
                     )
                 ],
             )
+
+    def _get_unique_hosts(self, records: list[dict]) -> list[Host]:
+        """Extracts unique host-user combinations from records."""
+        seen = set()
+        unique = []
+        for r in records:
+            pair = (r["user_id"], r["host"])
+            if pair not in seen:
+                seen.add(pair)
+                unique.append(Host(user_id=r["user_id"], name=r["host"]))
+        return unique
