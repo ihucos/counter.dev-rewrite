@@ -2,14 +2,11 @@ from time import sleep
 from urllib.parse import unquote
 
 from django.core.cache import cache
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.db import connection
-from django.db.models.query_utils import Q
 
 from accounts.models import User
 from counts.models import Count, Host
-
-from ... import models
 
 
 class BadKeyError(ValueError):
