@@ -27,9 +27,16 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--forever", action="store_true")
         parser.add_argument("--batch-size", type=int, default=1000)
+        parser.add_argument(
+            "--sleep",
+            type=float,
+            default=0,
+            help="Sleep duration in seconds between iterations when running with --forever (default: 0)",
+        )
 
     def handle(self, *args, **options):
         forever = options["forever"]
+        sleep_secs = options["sleep"]
         cursor = 0
         while True:
             cursor, keys = self.redis.scan(
@@ -39,6 +46,9 @@ class Command(BaseCommand):
 
             if cursor == 0 and not forever:
                 break
+
+            if cursor == 0 and forever and sleep_secs > 0:
+                sleep(sleep_secs)
 
     def _parse_key(self, key):
         try:
