@@ -56,10 +56,10 @@ class Command(BaseCommand):
             raise BadKeyError()
         key = key[len("v:") :]
         try:
-            host, user, metric, date = key.split(",")
+            host, user, cateogy, date = key.split(",")
         except ValueError:
             raise BadKeyError()
-        return unquote(host), unquote(user), unquote(metric), unquote(date)
+        return unquote(host), unquote(user), unquote(cateogy), unquote(date)
 
     def _pop_keys(self, keys) -> dict:
         pipeline = self.redis.pipeline(transaction=True)
@@ -75,19 +75,19 @@ class Command(BaseCommand):
         records = []
         for key, hval in self._pop_keys(keys).items():
             try:
-                host, user, metric, date = self._parse_key(key)
+                host, user, cateogy, date = self._parse_key(key)
             except BadKeyError:
                 print(f"Bad key: {key}")
                 continue
-            for value, count in hval.items():
+            for item, total in hval.items():
                 records.append(
                     {
                         "host": host,
                         "user": user,
-                        "metric": metric,
+                        "cateogy": cateogy,
                         "date": date,
-                        "value": value.decode(),
-                        "count": int(count),
+                        "item": item.decode(),
+                        "total": int(total),
                     }
                 )
         self._save_values_batch(records)
@@ -130,10 +130,10 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO {table} (host_id, metric, date, value, count)
+                INSERT INTO {table} (host_id, category, date, item, total)
                 VALUES {value_expressions}
-                ON CONFLICT (host_id, metric, date, value) 
-                DO UPDATE SET count = {table}.count + EXCLUDED.count
+                ON CONFLICT (host_id, category, date, item) 
+                DO UPDATE SET total = {table}.total + EXCLUDED.total
                 """.format(
                     table=Count._meta.db_table,
                     value_expressions=", ".join(
@@ -145,10 +145,10 @@ class Command(BaseCommand):
                     for r in valid_records
                     for val in (
                         r["host_id"],
-                        r["metric"],
+                        r["cateogy"],
                         r["date"],
-                        r["value"],
-                        r["count"],
+                        r["item"],
+                        r["total"],
                     )
                 ],
             )

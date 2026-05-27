@@ -132,9 +132,9 @@ class TestIngressCommand:
         count = models.Count.objects.get()
         assert count.host.name == "website.com"
         assert count.host.user.username == "peter"
-        assert count.metric == "loc"
-        assert count.value == "/"
-        assert count.count == 1
+        assert count.category == "loc"
+        assert count.item == "/"
+        assert count.total == 1
         assert str(count.date) == "2026-05-21"
 
     def test_multiple_values_per_key(self, db, redis):
@@ -146,18 +146,18 @@ class TestIngressCommand:
         )
         call_command("ingress")
         assert models.Count.objects.count() == 3
-        assert models.Count.objects.get(value="/").count == 10
+        assert models.Count.objects.get(item="/").total == 10
 
     def test_incremental_ingress(self, db, redis):
         """Running ingress again with the same key increments the count."""
         User.objects.get_or_create(username="peter")
         redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
         call_command("ingress")
-        assert models.Count.objects.get().count == 1
+        assert models.Count.objects.get().total == 1
 
         redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
         call_command("ingress")
-        assert models.Count.objects.get().count == 2
+        assert models.Count.objects.get().total == 2
 
     def test_host_auto_created(self, db, redis):
         """A non-existent Host is created on the fly."""
@@ -228,6 +228,6 @@ class TestIngressCommand:
         User.objects.get_or_create(username="alice")
         redis.hset("v:site.com,alice,loc,2026-06-01", mapping={"/": 5})
         call_command("ingress")
-        assert models.Count.objects.get().count == 5
+        assert models.Count.objects.get().total == 5
         call_command("ingress")
-        assert models.Count.objects.get().count == 5
+        assert models.Count.objects.get().total == 5

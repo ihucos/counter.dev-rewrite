@@ -89,27 +89,27 @@ class TestQueryView:
         assert response.data["pageview"]["/home"] == 3  # Only yesterday
         assert "/about" not in response.data.get("pageview", {})
 
-    def test_entries_with_same_metric_and_value_summed(self, api_client, user, host):
+    def test_entries_with_same_category_and_item_summed(self, api_client, user, host):
         api_client.force_authenticate(user=user)
 
-        # Create multiple counts with same metric/value on different days
+        # Create multiple counts with same category/item on different days
         today = date.today()
         yesterday = today - timedelta(days=1)
         day_before = yesterday - timedelta(days=1)
 
         Count.objects.create(
-            host=host, date=today, metric="pageview", value="/home", count=10
+            host=host, date=today, category="pageview", item="/home", total=10
         )
         Count.objects.create(
-            host=host, date=yesterday, metric="pageview", value="/home", count=5
+            host=host, date=yesterday, category="pageview", item="/home", total=5
         )
         Count.objects.create(
-            host=host, date=day_before, metric="pageview", value="/home", count=3
+            host=host, date=day_before, category="pageview", item="/home", total=3
         )
 
-        # Create a different value for same metric
+        # Create a different item for same category
         Count.objects.create(
-            host=host, date=today, metric="pageview", value="/about", count=7
+            host=host, date=today, category="pageview", item="/about", total=7
         )
 
         url = reverse("query")

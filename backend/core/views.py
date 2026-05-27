@@ -50,9 +50,9 @@ def query(request):
         qs = qs.filter(date__lte=end)
 
     result: dict[str, dict[str, int]] = defaultdict(dict)
-    rows = qs.values("metric", "value").annotate(total=Sum("count"))
+    rows = qs.values("category", "item").annotate(total=Sum("total"))
     for row in rows:
-        result[row["metric"]][row["value"]] = row["total"]
+        result[row["category"]][row["item"]] = row["total"]
 
     return Response(result)
 

@@ -28,16 +28,16 @@ class Count(models.Model):
         on_delete=models.CASCADE,
     )
     date = models.DateField()
-    metric = models.CharField(max_length=64)
-    value = models.CharField(max_length=255)
-    count = models.BigIntegerField(default=0)
+    category = models.CharField(max_length=64)
+    item = models.CharField(max_length=255)
+    total = models.BigIntegerField(default=0)
 
     class Meta:
-        unique_together = [("host", "date", "metric", "value")]
+        unique_together = [("host", "date", "category", "item")]
         indexes = [
             models.Index(fields=["host", "date"]),
-            models.Index(fields=["host", "metric"]),
+            models.Index(fields=["host", "category"]),
         ]
 
     def __str__(self) -> str:
-        return f"{self.host.user.username} {self.host.name} {self.date} {self.metric} {self.value} ({self.count})"
+        return f"{self.host.user.username} {self.host.name} {self.date} {self.category} {self.item} ({self.total})"

@@ -60,15 +60,15 @@ def counts(db, host):
     yesterday = today - timedelta(days=1)
 
     Count.objects.create(
-        host=host, date=today, metric="pageview", value="/home", count=10
+        host=host, date=today, category="pageview", item="/home", total=10
     )
     Count.objects.create(
-        host=host, date=today, metric="pageview", value="/about", count=5
+        host=host, date=today, category="pageview", item="/about", total=5
     )
     Count.objects.create(
-        host=host, date=yesterday, metric="pageview", value="/home", count=3
+        host=host, date=yesterday, category="pageview", item="/home", total=3
     )
     Count.objects.create(
-        host=host, date=today, metric="click", value="button1", count=2
+        host=host, date=today, category="click", item="button1", total=2
     )
     return Count.objects.all()

@@ -11,6 +11,6 @@ class HostAdmin(admin.ModelAdmin):
 
 @admin.register(Count)
 class CountAdmin(admin.ModelAdmin):
-    list_display = ("host", "date", "metric", "value", "count")
-    list_filter = ("metric", "date")
-    search_fields = ("host__name", "value")
+    list_display = ("host", "date", "category", "item", "total")
+    list_filter = ("category", "date")
+    search_fields = ("host__name", "item")
