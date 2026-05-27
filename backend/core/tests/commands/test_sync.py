@@ -3,7 +3,7 @@ import pytest
 
 from users.models import User
 from core import models
-from core.management.commands.ingress import BadKeyError, Command
+from core.management.commands.sync import BadKeyError, Command
 
 
 @pytest.fixture
@@ -98,24 +98,24 @@ class TestGetUniqueHosts:
 # Tests – Integration behaviour
 # ---------------------------------------------------------------------------
 
-class TestIngressCommand:
-    """Integration tests for the ``ingress`` management command."""
+class TestSyncCommand:
+    """Integration tests for the ``sync`` management command."""
 
     # --- Resilience ---
 
     def test_does_not_die_badly(self, db, user_data, host_data, redis_data):
         """All the fixture data is processed without raising an exception."""
-        call_command("ingress")
+        call_command("sync")
 
     def test_does_not_die_on_empty_redis(self, db):
-        """Running ingress when Redis is empty is harmless (no-op)."""
-        call_command("ingress")
+        """Running sync when Redis is empty is harmless (no-op)."""
+        call_command("sync")
         assert models.Count.objects.count() == 0
 
     def test_no_count_objects_created_when_no_users_exist(self, db, redis):
         """If no users exist, valid keys produce no Count rows."""
         redis.hset("v:site.com,nobody,loc,2026-05-21", mapping={"/": 5})
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.count() == 0
 
     # --- Basic ingestion ---
@@ -126,7 +126,7 @@ class TestIngressCommand:
         redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
         redis.hset("v:example.com,usernotindb,loc,2026-05-21", mapping={"/page": 2})
 
-        call_command("ingress")
+        call_command("sync")
 
         assert models.Count.objects.count() == 1
         count = models.Count.objects.get()
@@ -144,19 +144,19 @@ class TestIngressCommand:
             "v:mysite.com,alice,pageview,2026-06-01",
             mapping={"/": 10, "/about": 5, "/contact": 3},
         )
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.count() == 3
         assert models.Count.objects.get(item="/").total == 10
 
-    def test_incremental_ingress(self, db, redis):
-        """Running ingress again with the same key increments the count."""
+    def test_incremental_sync(self, db, redis):
+        """Running sync again with the same key increments the count."""
         User.objects.get_or_create(username="peter")
         redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.get().total == 1
 
         redis.hset("v:website.com,peter,loc,2026-05-21", mapping={"/": 1})
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.get().total == 2
 
     def test_host_auto_created(self, db, redis):
@@ -165,7 +165,7 @@ class TestIngressCommand:
         assert models.Host.objects.count() == 0
 
         redis.hset("v:newhost.com,charlie,loc,2026-07-01", mapping={"/": 1})
-        call_command("ingress")
+        call_command("sync")
 
         assert models.Host.objects.count() == 1
         host = models.Host.objects.get()
@@ -179,16 +179,16 @@ class TestIngressCommand:
         assert models.Host.objects.count() == 1
 
         redis.hset("v:dave.com,dave,loc,2026-07-01", mapping={"/": 1})
-        call_command("ingress")
+        call_command("sync")
 
         assert models.Host.objects.count() == 1
         assert models.Count.objects.get().host.name == "dave.com"
 
     # --- Post-ingestion cleanup ---
 
-    def test_keys_removed_after_ingress(self, db, user_data, redis_data):
+    def test_keys_removed_after_sync(self, db, user_data, redis_data):
         """Valid Redis keys are deleted after ingestion."""
-        call_command("ingress")
+        call_command("sync")
         remaining = redis_data.keys("v:*")
         for k in remaining:
             decoded = k.decode()
@@ -201,7 +201,7 @@ class TestIngressCommand:
 
     def test_all_fixture_data_ingested(self, db, user_data, redis_data):
         """All valid entries from ``redis_data`` are persisted."""
-        call_command("ingress")
+        call_command("sync")
         # 4 valid keys produce 6 Count rows:
         #   alicesite.com,alice,pageview,2026-05-21  -> 1 value
         #   bobsite.com,bob,click,2026-05-22         -> 2 values
@@ -215,19 +215,19 @@ class TestIngressCommand:
         redis.hset("v:no_prefix", mapping={"/": 1})
         redis.hset("v:,,,", mapping={"x": 1})
 
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.count() == 0
 
     def test_batch_argument(self, db, user_data, redis_data):
         """The ``--batch-size`` flag doesn't break processing."""
-        call_command("ingress", batch_size=5)
+        call_command("sync", batch_size=5)
         assert models.Count.objects.count() == 6
 
     def test_idempotent_when_no_new_data(self, db, redis):
-        """Running ingress when no new keys exist changes nothing."""
+        """Running sync when no new keys exist changes nothing."""
         User.objects.get_or_create(username="alice")
         redis.hset("v:site.com,alice,loc,2026-06-01", mapping={"/": 5})
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.get().total == 5
-        call_command("ingress")
+        call_command("sync")
         assert models.Count.objects.get().total == 5

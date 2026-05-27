@@ -16,7 +16,7 @@ class BadKeyError(ValueError):
 
 
 class Command(BaseCommand):
-    help = "Ingress data into the Core app, creating or updating Count records."
+    help = "Sync data into the Core app, creating or updating Count records."
 
     def __init__(self):
         self.redis = cache._cache.get_client()
