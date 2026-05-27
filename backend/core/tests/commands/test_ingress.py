@@ -2,8 +2,8 @@ from django.core.management import call_command
 import pytest
 
 from users.models import User
-from .. import models
-from ..management.commands.ingress import BadKeyError, Command
+from core import models
+from core.management.commands.ingress import BadKeyError, Command
 
 
 @pytest.fixture
