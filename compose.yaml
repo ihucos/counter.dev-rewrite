@@ -1,70 +1,7 @@
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    depends_on:
-      - redis
-      - postgres
-    develop:
-      watch:
-        - action: sync
-          path: backend/
-          target: /app
-          ignore:
-            - .venv/
-
-        - action: rebuild
-          path: backend/pyproject.toml
-
-        - action: rebuild
-          path: Dockerfile
-
-  sync:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    depends_on:
-      - redis
-      - postgres
-    restart: unless-stopped
-    command: ["uv", "run", "python", "manage.py", "sync", "--forever", "--sleep", "1"]
-    develop:
-      watch:
-        - action: sync
-          path: backend/
-          target: /app
-          ignore:
-            - .venv/
-
-        - action: rebuild
-          path: backend/pyproject.toml
-
-        - action: rebuild
-          path: Dockerfile
-
-  redis:
-    build:
-      context: ./redis
-      dockerfile: Dockerfile
-    ports:
-      - "6379:6379"
-    platform: linux/arm64
-    volumes:
-      - redis_data:/data
-
-  postgres:
-    build:
-      context: ./postgres
-      dockerfile: Dockerfile
-    ports:
-      - "5432:5432"
-    platform: linux/arm64
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+include:
+  - backend/compose.yaml
+  - redis/compose.yaml
+  - postgres/compose.yaml
 
 volumes:
   redis_data:

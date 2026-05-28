@@ -8,32 +8,6 @@ def _new_user_id() -> str:
     return uuid.uuid4().hex
 
 
-class UserManager(BaseUserManager):
-    use_in_migrations = True
-
-    def _create_user(self, username, password, email=None, **extra):
-        if not username:
-            raise ValueError("Username is required")
-        user = self.model(
-            username=username,
-            email=self.normalize_email(email) if email else None,
-            **extra,
-        )
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_user(self, username, password=None, email=None, **extra):
-        extra.setdefault("is_staff", False)
-        extra.setdefault("is_superuser", False)
-        return self._create_user(username, password, email, **extra)
-
-    def create_superuser(self, username, password=None, email=None, **extra):
-        extra.setdefault("is_staff", True)
-        extra.setdefault("is_superuser", True)
-        return self._create_user(username, password, email, **extra)
-
-
 class User(AbstractUser):
     # str id allows uuid4 hex for new users and arbitrary legacy strings
     id = models.CharField(
@@ -46,8 +20,6 @@ class User(AbstractUser):
     filter_allowed_domains = models.BooleanField(default=False)
 
     # IMPORTANT: username cannot be an uid!
-
-    objects = UserManager()
 
     REQUIRED_FIELDS: list[str] = []  # email is optional
 

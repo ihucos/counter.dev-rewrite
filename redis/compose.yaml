@@ -1,0 +1,10 @@
+services:
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6379:6379"
+    platform: linux/arm64
+    volumes:
+      - redis_data:/data
