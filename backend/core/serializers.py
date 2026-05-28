@@ -6,7 +6,8 @@ from .models import Host
 class HostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Host
-        fields = ["name"]
+        fields = ["id", "name", "hide"]
+        read_only_fields = ["id", "name"]
 
 
 class QueryRequestSerializer(serializers.Serializer):

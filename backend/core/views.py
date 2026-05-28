@@ -2,13 +2,14 @@ from collections import defaultdict
 
 from django.db.models import Sum
 from rest_framework.generics import get_object_or_404
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
 from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework import status
 
 
 from .models import Count, Host
@@ -18,12 +19,26 @@ from .serializers import (
 )
 
 
-class HostViewSet(viewsets.ReadOnlyModelViewSet):
+class HostViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,  # allows PATCH
+    viewsets.GenericViewSet,
+):
     serializer_class = HostSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Host.objects.filter(user=self.request.user).order_by("name")
+        qs = Host.objects.filter(user=self.request.user)
+        if self.request.user.hide_hosts:
+            qs = qs.filter(hide=False)
+        return qs.order_by("name")
+
+    def update(self, request, *args, **kwargs):
+        # PUT is not allowed (full replace) - only PATCH for partial updates
+        if request.method == "PUT":
+            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return super().update(request, *args, **kwargs)
 
 
 @api_view(["GET"])

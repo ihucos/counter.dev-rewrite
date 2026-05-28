@@ -8,6 +8,7 @@ class Host(models.Model):
         on_delete=models.CASCADE,
     )
     name = models.CharField(max_length=253)
+    hide = models.BooleanField(default=True)
 
     class Meta:
         unique_together = [("user", "name")]

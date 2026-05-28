@@ -77,7 +77,7 @@ class TestHostViewSet:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_create_not_allowed(self, api_client, user):
-        """POST is not allowed on the read-only viewset."""
+        """POST is not allowed."""
         api_client.force_authenticate(user=user)
         url = reverse("host-list")
         response = api_client.post(url, {"name": "new.com"}, format="json")
@@ -85,25 +85,113 @@ class TestHostViewSet:
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
     def test_update_not_allowed(self, api_client, user, host):
-        """PUT is not allowed on the read-only viewset."""
+        """PUT is not allowed (full replace)."""
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})
         response = api_client.put(url, {"name": "changed.com"}, format="json")
 
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
-    def test_partial_update_not_allowed(self, api_client, user, host):
-        """PATCH is not allowed on the read-only viewset."""
-        api_client.force_authenticate(user=user)
-        url = reverse("host-detail", kwargs={"pk": host.pk})
-        response = api_client.patch(url, {"name": "changed.com"}, format="json")
-
-        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
-
     def test_delete_not_allowed(self, api_client, user, host):
-        """DELETE is not allowed on the read-only viewset."""
+        """DELETE is not allowed."""
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})
         response = api_client.delete(url)
 
         assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
+    def test_partial_update_hide_field(self, api_client, user, host):
+        """PATCH the hide field on own host."""
+        api_client.force_authenticate(user=user)
+        url = reverse("host-detail", kwargs={"pk": host.pk})
+        response = api_client.patch(url, {"hide": True}, format="json")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["hide"] is True
+        # name should still be the same (read-only)
+        assert response.data["name"] == "example.com"
+
+        # toggle back
+        response = api_client.patch(url, {"hide": False}, format="json")
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["hide"] is False
+
+    def test_partial_update_hide_on_other_users_host_not_allowed(
+        self, api_client, user, other_user, other_host
+    ):
+        """PATCH hide on another user's host returns 404."""
+        api_client.force_authenticate(user=user)
+        url = reverse("host-detail", kwargs={"pk": other_host.pk})
+        response = api_client.patch(url, {"hide": True}, format="json")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_hide_hosts_true_filters_hidden_hosts(
+        self, api_client, user, host
+    ):
+        """When user.hide_hosts is True, hidden hosts are excluded from listing."""
+        # Create a visible host (hide=False)
+        visible_host = Host.objects.create(user=user, name="visible.com", hide=False)
+        # host fixture has hide=True by default (from model default)
+
+        user.hide_hosts = True
+        user.save()
+
+        api_client.force_authenticate(user=user)
+        url = reverse("host-list")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        names = [h["name"] for h in response.data]
+        assert "visible.com" in names
+        assert "example.com" not in names  # hidden host excluded
+
+    def test_hide_hosts_false_shows_all_hosts(
+        self, api_client, user, host
+    ):
+        """When user.hide_hosts is False, all hosts are shown regardless of hide flag."""
+        Host.objects.create(user=user, name="visible.com", hide=False)
+        Host.objects.create(user=user, name="hidden-too.com", hide=True)
+
+        user.hide_hosts = False
+        user.save()
+
+        api_client.force_authenticate(user=user)
+        url = reverse("host-list")
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        names = [h["name"] for h in response.data]
+        assert "example.com" in names
+        assert "visible.com" in names
+        assert "hidden-too.com" in names
+
+    def test_hide_hosts_true_detail_of_hidden_host_returns_404(
+        self, api_client, user, host
+    ):
+        """When hide_hosts is True, retrieving a hidden host returns 404."""
+        user.hide_hosts = True
+        user.save()
+
+        api_client.force_authenticate(user=user)
+        url = reverse("host-detail", kwargs={"pk": host.pk})
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_hide_hosts_true_detail_of_visible_host_works(
+        self, api_client, user, host
+    ):
+        """When hide_hosts is True, a visible host can still be retrieved."""
+        host.hide = False
+        host.save()
+
+        user.hide_hosts = True
+        user.save()
+
+        api_client.force_authenticate(user=user)
+        url = reverse("host-detail", kwargs={"pk": host.pk})
+        response = api_client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["name"] == "example.com"

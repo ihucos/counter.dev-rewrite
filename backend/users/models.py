@@ -16,8 +16,7 @@ class User(AbstractUser):
     email = models.EmailField(blank=True, null=True)
     timezone = models.IntegerField(default=0, help_text="UTC offset in hours")
     prefs = models.JSONField(default=dict, blank=True)
-    allowed_domains = models.JSONField(default=list, blank=True)
-    filter_allowed_domains = models.BooleanField(default=False)
+    hide_hosts = models.BooleanField(default=False)
 
     # IMPORTANT: username cannot be an uid!
 
