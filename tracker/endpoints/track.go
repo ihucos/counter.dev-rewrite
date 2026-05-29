@@ -45,7 +45,7 @@ func init() {
 			}
 			user = ctx.User(userId)
 		} else {
-			user = ctx.UserByCachedUUID(uuid)
+			user, _ = ctx.UserByCachedUUID(uuid)
 		}
 
 		//
