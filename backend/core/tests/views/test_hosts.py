@@ -126,16 +126,14 @@ class TestHostViewSet:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_hide_hosts_true_filters_hidden_hosts(
-        self, api_client, user, host
-    ):
+    def test_hide_hosts_true_filters_hidden_hosts(self, api_client, user, host):
         """When user.hide_hosts is True, hidden hosts are excluded from listing."""
         # Create a visible host (hide=False)
         visible_host = Host.objects.create(user=user, name="visible.com", hide=False)
         # host fixture has hide=True by default (from model default)
 
-        user.hide_hosts = True
-        user.save()
+        user.profile.hide_hosts = True
+        user.profile.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-list")
@@ -146,15 +144,13 @@ class TestHostViewSet:
         assert "visible.com" in names
         assert "example.com" not in names  # hidden host excluded
 
-    def test_hide_hosts_false_shows_all_hosts(
-        self, api_client, user, host
-    ):
+    def test_hide_hosts_false_shows_all_hosts(self, api_client, user, host):
         """When user.hide_hosts is False, all hosts are shown regardless of hide flag."""
         Host.objects.create(user=user, name="visible.com", hide=False)
         Host.objects.create(user=user, name="hidden-too.com", hide=True)
 
-        user.hide_hosts = False
-        user.save()
+        user.profile.hide_hosts = False
+        user.profile.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-list")
@@ -170,8 +166,8 @@ class TestHostViewSet:
         self, api_client, user, host
     ):
         """When hide_hosts is True, retrieving a hidden host returns 404."""
-        user.hide_hosts = True
-        user.save()
+        user.profile.hide_hosts = True
+        user.profile.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})
@@ -179,15 +175,13 @@ class TestHostViewSet:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_hide_hosts_true_detail_of_visible_host_works(
-        self, api_client, user, host
-    ):
+    def test_hide_hosts_true_detail_of_visible_host_works(self, api_client, user, host):
         """When hide_hosts is True, a visible host can still be retrieved."""
         host.hide = False
         host.save()
 
-        user.hide_hosts = True
-        user.save()
+        user.profile.hide_hosts = True
+        user.profile.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})
