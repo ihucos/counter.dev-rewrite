@@ -44,7 +44,6 @@ class Count(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    email = models.EmailField(blank=True, null=True)
     timezone = models.IntegerField(default=0, help_text="UTC offset in hours")
     prefs = models.JSONField(default=dict, blank=True)
     hide_hosts = models.BooleanField(default=False)

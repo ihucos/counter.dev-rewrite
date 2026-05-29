@@ -22,11 +22,11 @@ class QueryRequestSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ("company_name", "phone_number", "avatar", "bio")
+        fields = ("timezone", "prefs", "hide_hosts")
 
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
-    profile = UserProfileSerializer(source="profile")
+    profile = UserProfileSerializer()
 
     class Meta(UserDetailsSerializer.Meta):
         fields = UserDetailsSerializer.Meta.fields + ("profile",)
