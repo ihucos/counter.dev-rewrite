@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12-dev \
     libpq-dev \
     gcc \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv using the official standalone installer script

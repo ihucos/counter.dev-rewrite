@@ -3,11 +3,14 @@ from datetime import date, timedelta
 from rest_framework.test import APIClient
 from django.core.cache import cache as django_cache
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from redis import Redis
 import re
 
-from users.models import User
 from core.models import Count, Host
+
+
+User = get_user_model()
 
 
 def _get_worker_id(request):

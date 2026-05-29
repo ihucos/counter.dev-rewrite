@@ -6,8 +6,10 @@ from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from users.models import User
 from core.models import Count, Host
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class BadKeyError(ValueError):
@@ -19,7 +21,6 @@ class BadKeyError(ValueError):
 class Command(BaseCommand):
     help = "Sync data into the Core app, creating or updating Count records."
 
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.redis = cache._cache.get_client()
@@ -29,7 +30,9 @@ class Command(BaseCommand):
 
     def exit_gracefully(self, signum, frame):
         self.stdout.write(
-            self.style.WARNING(f"Received signal {signum}. Finishing current iteration...")
+            self.style.WARNING(
+                f"Received signal {signum}. Finishing current iteration..."
+            )
         )
         self.kill_now = True
 

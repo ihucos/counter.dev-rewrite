@@ -1,9 +1,12 @@
 from django.core.management import call_command
 import pytest
 
-from users.models import User
 from core import models
 from core.management.commands.sync import BadKeyError, Command
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 @pytest.fixture
@@ -47,6 +50,7 @@ def redis_data(redis):
 # ---------------------------------------------------------------------------
 # Tests – Command unit behaviour
 # ---------------------------------------------------------------------------
+
 
 class TestParseKey:
     """Direct tests of the ``_parse_key`` helper method."""
@@ -97,6 +101,7 @@ class TestGetUniqueHosts:
 # ---------------------------------------------------------------------------
 # Tests – Integration behaviour
 # ---------------------------------------------------------------------------
+
 
 class TestSyncCommand:
     """Integration tests for the ``sync`` management command."""
