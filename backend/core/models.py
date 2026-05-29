@@ -44,11 +44,11 @@ class Count(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    phone_number = models.CharField(max_length=20, blank=True)
-    company = models.CharField(max_length=100, blank=True)
-    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
-    bio = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    email = models.EmailField(blank=True, null=True)
+    timezone = models.IntegerField(default=0, help_text="UTC offset in hours")
+    prefs = models.JSONField(default=dict, blank=True)
+    allowed_domains = models.JSONField(default=list, blank=True)
+    filter_allowed_domains = models.BooleanField(default=False)
 
 
 @receiver(post_save, sender=User)

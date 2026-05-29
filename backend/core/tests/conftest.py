@@ -85,20 +85,24 @@ def api_client():
 
 @pytest.fixture
 def user(db):
-    return User.objects.create_user(
+    u = User.objects.create_user(
         username="testuser",
         password="testpass123",
-        timezone=0,
     )
+    u.profile.timezone = 0
+    u.save()
+    return u
 
 
 @pytest.fixture
 def other_user(db):
-    return User.objects.create_user(
+    u = User.objects.create_user(
         username="otheruser",
         password="otherpass123",
-        timezone=0,
     )
+    u.profile.timezone = 0
+    u.save()
+    return u
 
 
 @pytest.fixture

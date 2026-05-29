@@ -123,7 +123,7 @@ class Command(BaseCommand):
         # Map users specified in redis to database users
         user_identifiers = {r["user"] for r in records}
         user_map = {
-            **User.objects.in_bulk(user_identifiers, field_name="id"),
+            # **User.objects.in_bulk(user_identifiers, field_name="id"), # Use uuid
             **User.objects.in_bulk(user_identifiers, field_name="username"),
         }
 

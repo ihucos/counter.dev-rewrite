@@ -30,7 +30,7 @@ class HostViewSet(
 
     def get_queryset(self):
         qs = Host.objects.filter(user=self.request.user)
-        if self.request.user.hide_hosts:
+        if self.request.user.profile.hide_hosts:
             qs = qs.filter(hide=False)
         return qs.order_by("name")
 
