@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+import uuid
 
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -43,6 +44,7 @@ class Count(models.Model):
 
 
 class UserProfile(models.Model):
+    uuid = models.UUIDField(unique=True, default=uuid.uuid4)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     timezone = models.IntegerField(default=0, help_text="UTC offset in hours")
     prefs = models.JSONField(default=dict, blank=True)
