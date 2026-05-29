@@ -1,6 +1,6 @@
 import uuid
 
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
@@ -9,7 +9,6 @@ def _new_user_id() -> str:
 
 
 class User(AbstractUser):
-    # str id allows uuid4 hex for new users and arbitrary legacy strings
     id = models.CharField(
         primary_key=True, max_length=64, default=_new_user_id, editable=False
     )

@@ -66,27 +66,7 @@ class PasswordChangeSerializer(serializers.Serializer):
         return value
 
 
-class EmailChangeSerializer(serializers.Serializer):
+class UpdateSettingsSerializer(serializers.Serializer):
+    timezone = serializers.IntegerField(required=False)
+    prefs = serializers.DictField(child=serializers.CharField(), required=False)
     email = serializers.EmailField(allow_null=True, allow_blank=True, required=False)
-
-
-class TimezoneSerializer(serializers.Serializer):
-    timezone = serializers.IntegerField()
-
-
-class PrefsSerializer(serializers.Serializer):
-    prefs = serializers.DictField(child=serializers.CharField())
-
-
-class PasswordResetRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    uid = serializers.CharField()
-    token = serializers.CharField()
-    new_password = serializers.CharField(write_only=True)
-
-    def validate_new_password(self, value):
-        password_validation.validate_password(value)
-        return value

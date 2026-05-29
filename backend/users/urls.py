@@ -8,13 +8,5 @@ urlpatterns = [
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path("me/", views.MeView.as_view(), name="me"),
     path("password/change/", views.PasswordChangeView.as_view(), name="password-change"),
-    path("email/change/", views.EmailChangeView.as_view(), name="email-change"),
-    path("timezone/", views.TimezoneView.as_view(), name="timezone"),
-    path("prefs/", views.PrefsView.as_view(), name="prefs"),
-    path("password/reset/", views.password_reset_request, name="password-reset"),
-    path(
-        "password/reset/confirm/",
-        views.password_reset_confirm,
-        name="password-reset-confirm",
-    ),
+    path("settings/", views.SettingsView.as_view(), name="settings"),
 ]
