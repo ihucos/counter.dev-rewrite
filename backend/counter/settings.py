@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     # Custom apps
+    "counter",
     "core",
 ]
 
@@ -87,7 +88,7 @@ CACHES = {
     }
 }
 
-# AUTH_USER_MODEL = "users.User"
+AUTH_USER_MODEL = "counter.User"
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

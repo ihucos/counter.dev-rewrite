@@ -132,8 +132,8 @@ class TestHostViewSet:
         visible_host = Host.objects.create(user=user, name="visible.com", hide=False)
         # host fixture has hide=True by default (from model default)
 
-        user.profile.hide_hosts = True
-        user.profile.save()
+        user.hide_hosts = True
+        user.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-list")
@@ -149,8 +149,8 @@ class TestHostViewSet:
         Host.objects.create(user=user, name="visible.com", hide=False)
         Host.objects.create(user=user, name="hidden-too.com", hide=True)
 
-        user.profile.hide_hosts = False
-        user.profile.save()
+        user.hide_hosts = False
+        user.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-list")
@@ -166,8 +166,8 @@ class TestHostViewSet:
         self, api_client, user, host
     ):
         """When hide_hosts is True, retrieving a hidden host returns 404."""
-        user.profile.hide_hosts = True
-        user.profile.save()
+        user.hide_hosts = True
+        user.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})
@@ -180,8 +180,8 @@ class TestHostViewSet:
         host.hide = False
         host.save()
 
-        user.profile.hide_hosts = True
-        user.profile.save()
+        user.hide_hosts = True
+        user.save()
 
         api_client.force_authenticate(user=user)
         url = reverse("host-detail", kwargs={"pk": host.pk})

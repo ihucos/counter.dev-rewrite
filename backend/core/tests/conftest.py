@@ -88,9 +88,8 @@ def user(db):
     u = User.objects.create_user(
         username="testuser",
         password="testpass123",
+        timezone=0,
     )
-    u.profile.timezone = 0
-    u.save()
     return u
 
 
@@ -99,9 +98,8 @@ def other_user(db):
     u = User.objects.create_user(
         username="otheruser",
         password="otherpass123",
+        timezone=0,
     )
-    u.profile.timezone = 0
-    u.save()
     return u
 
 
