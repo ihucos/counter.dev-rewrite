@@ -15,7 +15,6 @@ import (
 )
 
 func Origin2SiteId(origin string) string {
-	// this function returns
 	var re = regexp.MustCompile(`^.*?:\/\/(?:www.)?(.*)$`)
 	var match = re.FindStringSubmatch(origin)
 	if len(match) < 1 {
@@ -32,12 +31,11 @@ func init() {
 		// Input validation
 		//
 		var user models.User
+		var err error
 		uuid := ctx.R.FormValue("id")
 		if uuid == "" {
 			userId := ctx.R.FormValue("user")
 			if userId == "" {
-				// this has to be supported until the end of time, or
-				// alternatively all current users are not using that option.
 				userId = ctx.R.FormValue("site")
 				if userId == "" {
 					ctx.ReturnBadRequest("missing site param")
@@ -45,7 +43,10 @@ func init() {
 			}
 			user = ctx.User(userId)
 		} else {
-			user = ctx.UserByCachedUUID(uuid)
+			user, err = ctx.UserByCachedUUID(uuid)
+			if err != nil {
+				ctx.ReturnBadRequest(err.Error())
+			}
 		}
 
 		//
@@ -76,7 +77,6 @@ func init() {
 
 		//
 		// drop if bot or origin is from localhost
-		// see issue: https://github.com/avct/uasurfer/issues/65
 		//
 		if ua.IsBot() || strings.Contains(userAgent, " HeadlessChrome/") || strings.Contains(userAgent, "PetalBot;") || strings.Contains(userAgent, "AdsBot") {
 			return
@@ -141,7 +141,6 @@ func init() {
 		visit["device"] = device
 
 		var platform string
-		// Show "Android" on android devices instead of "Linux".
 		if ua.OS.Name == uasurfer.OSAndroid {
 			platform = "Android"
 		} else {

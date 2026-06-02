@@ -10,12 +10,12 @@ func init() {
 	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
 		visit := make(models.Visit)
 
-		user := ctx.UserByCachedUUID(ctx.R.FormValue("id"))
+		user, err := ctx.UserByCachedUUID(ctx.R.FormValue("id"))
+		if err != nil {
+			ctx.ReturnBadRequest(err.Error())
+		}
 		now := utils.TimeNow(ctx.ParseUTCOffset("utcoffset"))
 
-		// visit is a weird name, I should rename that to something
-		// else. It must not be necessarily a visit, it's just a
-		// counter
 		visit["page"] = ctx.R.FormValue("page")
 		visit["count"] = "pageview"
 
@@ -26,11 +26,7 @@ func init() {
 		siteId := Origin2SiteId(origin)
 		visits := user.NewSite(siteId)
 		visits.SaveVisit(visit, now)
-		// user.Signal() - uncommented to save some resources I guess.
 
-		//
-		// Not strictly necessary but avoids the browser issuing an error.
-		//
 		ctx.W.Header().Set("Access-Control-Allow-Origin", "*")
 
 		ctx.Return("", 204)
