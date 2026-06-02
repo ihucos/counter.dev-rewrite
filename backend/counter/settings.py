@@ -129,8 +129,8 @@ PASSWORD_RESET_URL_BASE = os.environ.get(
 )
 
 REST_AUTH = {
-    "USER_DETAILS_SERIALIZER": "core.serializers.CustomUserDetailsSerializer",
-    "REGISTER_SERIALIZER": "core.serializers.CustomRegisterSerializer",
+    "USER_DETAILS_SERIALIZER": "counter.serializers.CustomUserDetailsSerializer",
+    "REGISTER_SERIALIZER": "counter.serializers.CustomRegisterSerializer",
 }
 
 SITE_ID = 1
