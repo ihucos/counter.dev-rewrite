@@ -1,8 +1,5 @@
 from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import UserDetailsSerializer
-from allauth.account.adapter import get_adapter
-from allauth.account.utils import setup_user_email
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -18,33 +15,17 @@ class CustomRegisterSerializer(RegisterSerializer):
         data = super().get_cleaned_data()
         data.update({
             'timezone': self.validated_data.get('timezone', 0),
-            'prefs': self.validated_data.get('prefs', dict),
+            'prefs': self.validated_data.get('prefs', dict()),
             'hide_hosts': self.validated_data.get('hide_hosts', False),
         })
         return data
 
     def save(self, request):
-        adapter = get_adapter()
-        user = adapter.new_user(request)
-        self.cleaned_data = self.get_cleaned_data()
-        user = adapter.save_user(request, user, self, commit=False)
-        if "password1" in self.cleaned_data:
-            try:
-                adapter.clean_password(self.cleaned_data['password1'], user=user)
-            except DjangoValidationError as exc:
-                raise serializers.ValidationError(
-                    detail=serializers.as_serializer_error(exc)
-                )
-        user.save()
-        self.custom_signup(request, user)
-        setup_user_email(request, user, [])
-
-        # Set extra fields
+        user = super().save(request)
         user.timezone = self.cleaned_data.get('timezone', 0)
-        user.prefs = self.cleaned_data.get('prefs', dict)
+        user.prefs = self.cleaned_data.get('prefs', dict())
         user.hide_hosts = self.cleaned_data.get('hide_hosts', False)
-        user.save()
-
+        user.save(update_fields=['timezone', 'prefs', 'hide_hosts'])
         return user
 
 
@@ -60,8 +41,3 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
             "prefs",
             "hide_hosts",
         )
-
-    def update(self, instance, validated_data):
-        # Update user fields directly (no profile indirection)
-        instance = super().update(instance, validated_data)
-        return instance
