@@ -10,7 +10,7 @@ func init() {
 	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
 		visit := make(models.Visit)
 
-		user, _ := ctx.UserByCachedUUID(ctx.R.FormValue("id"))
+		user := ctx.UserByCachedUUID(ctx.R.FormValue("id"))
 		now := utils.TimeNow(ctx.ParseUTCOffset("utcoffset"))
 
 		// visit is a weird name, I should rename that to something
