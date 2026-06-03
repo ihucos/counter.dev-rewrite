@@ -1,5 +1,6 @@
 include:
   - backend/compose.yaml
+  - tracker/compose.yaml
   - redis/compose.yaml
   - postgres/compose.yaml
 
