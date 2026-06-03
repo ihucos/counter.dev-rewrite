@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"net/url"
 	"strings"
 	"time"
@@ -11,16 +10,11 @@ import (
 )
 
 const (
-	truncateAt        = 256
-	zetMaxSize        = 100
-	zetTrimEveryCalls = 100
-	loglinesKeep      = 30
+	truncateAt   = 256
+	loglinesKeep = 30
 )
 
-var (
-	fieldsZet  = []string{"lang", "ref", "loc", "page"}
-	fieldsHash = []string{"date", "weekday", "platform", "hour", "browser", "device", "country", "screen"}
-)
+var fields = []string{"lang", "ref", "loc", "page", "date", "weekday", "platform", "hour", "browser", "device", "country", "screen"}
 
 // ScreenResolutions is a set of known screen resolutions.
 var ScreenResolutions = map[string]bool{
@@ -90,16 +84,11 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	return VisitItemKey{Origin: origin, ID: id, Field: field, TimeRange: timeRange}, nil
 }
 
-// RedisType returns whether this field is stored as a zet (sorted set) or hash.
+// RedisType returns "hash" for all recognized fields. All data is stored as hashes.
 func (k VisitItemKey) RedisType() string {
-	for _, f := range fieldsHash {
+	for _, f := range fields {
 		if f == k.Field {
 			return "hash"
-		}
-	}
-	for _, f := range fieldsZet {
-		if f == k.Field {
-			return "zet"
 		}
 	}
 	return ""
@@ -139,22 +128,7 @@ func (s Site) Log(line string) {
 }
 
 func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
-	for _, field := range fieldsZet {
-		val := visitField(v, field)
-		if val == "" {
-			continue
-		}
-		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, ID: s.id}.String()
-		s.conn.Send("ZINCRBY", key, 1, truncate(val))
-		if rand.Intn(zetTrimEveryCalls) == 0 {
-			s.conn.Send("ZREMRANGEBYRANK", key, 0, -zetMaxSize)
-		}
-		if !expireAt.IsZero() {
-			s.conn.Send("EXPIREAT", key, expireAt.Unix())
-		}
-	}
-
-	for _, field := range fieldsHash {
+	for _, field := range fields {
 		val := visitField(v, field)
 		if val == "" {
 			continue
