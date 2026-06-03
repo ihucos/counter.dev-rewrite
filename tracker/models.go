@@ -122,15 +122,8 @@ func NewSite(conn redis.Conn, userID, origin string) Site {
 // SaveVisit persists a visit to Redis at multiple time granularities.
 func (s Site) SaveVisit(v Visit, at time.Time) {
 	expireTolerance := 14 * time.Hour
-
-	nextYear := time.Date(at.Year(), time.January, 1, 0, 0, 0, 0, at.Location()).AddDate(1, 0, 0)
-	nextMonth := time.Date(at.Year(), at.Month(), 1, 0, 0, 0, 0, at.Location()).AddDate(0, 1, 0)
 	inTwoDays := time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location()).AddDate(0, 0, 2)
-
-	s.saveVisitPart(at.Format("2006"), v, nextYear.Add(expireTolerance))
-	s.saveVisitPart(at.Format("2006-01"), v, nextMonth.Add(expireTolerance))
 	s.saveVisitPart(at.Format("2006-01-02"), v, inTwoDays.Add(expireTolerance))
-	s.saveVisitPart("all", v, time.Time{})
 }
 
 // Log appends a log line for the site.
@@ -148,9 +141,7 @@ func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 		}
 		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, userID: s.userID}.String()
 		s.conn.Send("HINCRBY", key, truncate(val), 1)
-		if !expireAt.IsZero() {
-			s.conn.Send("EXPIREAT", key, expireAt.Unix())
-		}
+		s.conn.Send("EXPIREAT", key, expireAt.Unix())
 	}
 }
 
