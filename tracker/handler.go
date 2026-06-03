@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/xavivars/uasurfer"
@@ -151,9 +152,9 @@ func handleTrackPage(pool *redis.Pool) http.HandlerFunc {
 		now := LocalTime(parseUTCOffset(r, "utcoffset"))
 
 		v := Visit{
-			Page:  r.FormValue("page"),
-			Date:  now.Format("2006-01-02"),
-			Hour:  fmt.Sprintf("%d", now.Hour()),
+			Page: r.FormValue("page"),
+			Date: now.Format("2006-01-02"),
+			Hour: fmt.Sprintf("%d", now.Hour()),
 		}
 
 		origin := r.Header.Get("Origin")
@@ -190,4 +191,9 @@ func parseUTCOffset(r *http.Request, key string) int {
 		return -12
 	}
 	return offset
+}
+
+// LocalTime returns the current time adjusted by utcOffset hours.
+func LocalTime(utcOffset int) time.Time {
+	return time.Now().UTC().Add(time.Duration(utcOffset) * time.Hour)
 }
