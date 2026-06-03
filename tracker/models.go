@@ -46,7 +46,7 @@ type Visit struct {
 // VisitItemKey represents a Redis key for visit data.
 type VisitItemKey struct {
 	TimeRange string
-	ID        string
+	userID    string
 	Origin    string
 	Field     string
 }
@@ -54,7 +54,7 @@ type VisitItemKey struct {
 func (k VisitItemKey) String() string {
 	return fmt.Sprintf("v:%s,%s,%s,%s",
 		url.QueryEscape(k.Origin),
-		url.QueryEscape(k.ID),
+		url.QueryEscape(k.userID),
 		url.QueryEscape(k.Field),
 		url.QueryEscape(k.TimeRange))
 }
@@ -69,7 +69,7 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	if err != nil {
 		return VisitItemKey{}, err
 	}
-	id, err := url.QueryUnescape(parts[1])
+	userID, err := url.QueryUnescape(parts[1])
 	if err != nil {
 		return VisitItemKey{}, err
 	}
@@ -81,7 +81,7 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	if err != nil {
 		return VisitItemKey{}, err
 	}
-	return VisitItemKey{Origin: origin, ID: id, Field: field, TimeRange: timeRange}, nil
+	return VisitItemKey{Origin: origin, userID: userID, Field: field, TimeRange: timeRange}, nil
 }
 
 // RedisType returns "hash" for all recognized fields. All data is stored as hashes.
@@ -98,12 +98,12 @@ func (k VisitItemKey) RedisType() string {
 type Site struct {
 	conn   redis.Conn
 	origin string
-	id     string
+	userID string
 }
 
-// NewSite creates a Site for the given connection, id (from id/site param) and origin.
-func NewSite(conn redis.Conn, id, origin string) Site {
-	return Site{conn: conn, origin: origin, id: truncate(id)}
+// NewSite creates a Site for the given connection, userID (from id/site param) and origin.
+func NewSite(conn redis.Conn, userID, origin string) Site {
+	return Site{conn: conn, origin: origin, userID: truncate(userID)}
 }
 
 // SaveVisit persists a visit to Redis at multiple time granularities.
@@ -122,7 +122,7 @@ func (s Site) SaveVisit(v Visit, at time.Time) {
 
 // Log appends a log line for the site.
 func (s Site) Log(line string) {
-	key := fmt.Sprintf("log:%s:%s", s.origin, s.id)
+	key := fmt.Sprintf("log:%s:%s", s.origin, s.userID)
 	s.conn.Send("ZADD", key, time.Now().Unix(), truncate(line))
 	s.conn.Send("ZREMRANGEBYRANK", key, 0, -loglinesKeep)
 }
@@ -133,7 +133,7 @@ func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 		if val == "" {
 			continue
 		}
-		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, ID: s.id}.String()
+		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, userID: s.userID}.String()
 		s.conn.Send("HINCRBY", key, truncate(val), 1)
 		if !expireAt.IsZero() {
 			s.conn.Send("EXPIREAT", key, expireAt.Unix())
