@@ -14,7 +14,8 @@ const (
 	loglinesKeep = 30
 )
 
-var fields = []string{"lang", "ref", "loc", "page", "date", "weekday", "platform", "hour", "browser", "device", "country", "screen"}
+// fields lists all visit fields stored as individual hash entries in Redis.
+var fields = []string{"lang", "ref", "loc", "page", "date", "weekday", "platform", "browser", "device", "country", "screen", "hour"}
 
 // ScreenResolutions is a set of known screen resolutions.
 var ScreenResolutions = map[string]bool{
@@ -29,18 +30,38 @@ var ScreenResolutions = map[string]bool{
 
 // Visit holds parsed tracking data for a single request.
 type Visit struct {
-	Lang     string
-	Ref      string
-	Loc      string
-	Page     string
-	Date     string
-	Weekday  string
-	Hour     string
-	Platform string
-	Browser  string
-	Device   string
-	Country  string
-	Screen   string
+	Lang, Ref, Loc, Page, Date, Weekday, Platform, Browser, Device, Country, Screen, Hour string
+}
+
+// Field returns the value of the named field, or "" if not found.
+func (v Visit) Field(name string) string {
+	switch name {
+	case "lang":
+		return v.Lang
+	case "ref":
+		return v.Ref
+	case "loc":
+		return v.Loc
+	case "page":
+		return v.Page
+	case "date":
+		return v.Date
+	case "weekday":
+		return v.Weekday
+	case "hour":
+		return v.Hour
+	case "platform":
+		return v.Platform
+	case "browser":
+		return v.Browser
+	case "device":
+		return v.Device
+	case "country":
+		return v.Country
+	case "screen":
+		return v.Screen
+	}
+	return ""
 }
 
 // VisitItemKey represents a Redis key for visit data.
@@ -65,26 +86,18 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	if len(parts) != 4 {
 		return VisitItemKey{}, fmt.Errorf("malformed key: %s", key)
 	}
-	origin, err := url.QueryUnescape(parts[0])
-	if err != nil {
-		return VisitItemKey{}, err
+	vals := make([]string, 4)
+	for i, p := range parts {
+		v, err := url.QueryUnescape(p)
+		if err != nil {
+			return VisitItemKey{}, err
+		}
+		vals[i] = v
 	}
-	userID, err := url.QueryUnescape(parts[1])
-	if err != nil {
-		return VisitItemKey{}, err
-	}
-	field, err := url.QueryUnescape(parts[2])
-	if err != nil {
-		return VisitItemKey{}, err
-	}
-	timeRange, err := url.QueryUnescape(parts[3])
-	if err != nil {
-		return VisitItemKey{}, err
-	}
-	return VisitItemKey{Origin: origin, userID: userID, Field: field, TimeRange: timeRange}, nil
+	return VisitItemKey{Origin: vals[0], userID: vals[1], Field: vals[2], TimeRange: vals[3]}, nil
 }
 
-// RedisType returns "hash" for all recognized fields. All data is stored as hashes.
+// RedisType returns "hash" if the field is recognized.
 func (k VisitItemKey) RedisType() string {
 	for _, f := range fields {
 		if f == k.Field {
@@ -101,7 +114,7 @@ type Site struct {
 	userID string
 }
 
-// NewSite creates a Site for the given connection, userID (from id/site param) and origin.
+// NewSite creates a Site for the given connection, userID and origin.
 func NewSite(conn redis.Conn, userID, origin string) Site {
 	return Site{conn: conn, origin: origin, userID: truncate(userID)}
 }
@@ -129,7 +142,7 @@ func (s Site) Log(line string) {
 
 func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 	for _, field := range fields {
-		val := visitField(v, field)
+		val := v.Field(field)
 		if val == "" {
 			continue
 		}
@@ -139,36 +152,6 @@ func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 			s.conn.Send("EXPIREAT", key, expireAt.Unix())
 		}
 	}
-}
-
-func visitField(v Visit, field string) string {
-	switch field {
-	case "lang":
-		return v.Lang
-	case "ref":
-		return v.Ref
-	case "loc":
-		return v.Loc
-	case "page":
-		return v.Page
-	case "date":
-		return v.Date
-	case "weekday":
-		return v.Weekday
-	case "hour":
-		return v.Hour
-	case "platform":
-		return v.Platform
-	case "browser":
-		return v.Browser
-	case "device":
-		return v.Device
-	case "country":
-		return v.Country
-	case "screen":
-		return v.Screen
-	}
-	return ""
 }
 
 func truncate(s string) string {
