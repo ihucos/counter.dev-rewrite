@@ -1,13 +1,13 @@
 package endpoints
 
 import (
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 	"github.com/ihucos/counter.dev/models"
 	"github.com/ihucos/counter.dev/utils"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		visit := make(models.Visit)
 
 		user := ctx.UserByCachedUUID(ctx.R.FormValue("id"))

@@ -5,7 +5,7 @@ import (
 	"syscall"
 
 	_ "github.com/ihucos/counter.dev/endpoints"
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 		fmt.Println("Error Setting Rlimit ", err)
 	}
 
-	app := lib.NewApp()
+	app := lob.NewApp()
 	app.CreateTable()
 	go app.ArchiveHotVisitsForever()
 	app.ConnectEndpoints()

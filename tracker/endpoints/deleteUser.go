@@ -3,11 +3,11 @@ package endpoints
 import (
 	"net/http"
 
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		ctx.CheckMethod("POST")
 		confirmUser := ctx.R.FormValue("confirmUser")
 		user := ctx.ForceUser()

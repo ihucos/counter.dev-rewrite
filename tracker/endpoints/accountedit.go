@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		ctx.CheckMethod("POST")
 		currentPassword := ctx.R.FormValue("current_password")
 		newPassword := ctx.R.FormValue("new_password")

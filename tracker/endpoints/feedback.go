@@ -2,12 +2,12 @@ package endpoints
 
 import (
 	"fmt"
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 	"gopkg.in/gomail.v2"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		mail := ctx.R.FormValue("contact")
 		feedback := ctx.R.FormValue("feedback")
 		if feedback == "" {

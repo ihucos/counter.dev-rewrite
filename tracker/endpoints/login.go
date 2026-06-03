@@ -1,9 +1,9 @@
 package endpoints
 
-import "github.com/ihucos/counter.dev/lib"
+import "github.com/ihucos/counter.dev/lob"
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		userId := ctx.R.FormValue("user")
 		passwordInput := ctx.R.FormValue("password")
 		if userId == "" {

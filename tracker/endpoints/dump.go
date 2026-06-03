@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 	"github.com/ihucos/counter.dev/models"
 	"github.com/ihucos/counter.dev/utils"
 )
@@ -100,7 +100,7 @@ func LoadDump(user models.User, utcOffset int) (Dump, error) {
 }
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		ctx.W.Header().Set("Content-Type", "text/event-stream")
 		ctx.W.Header().Set("Cache-Control", "no-cache")
 		ctx.W.Header().Set("Connection", "keep-alive")
@@ -127,18 +127,18 @@ func init() {
 
 		user.TouchDump()
 
-		archive := make(map[string]lib.QueryArchiveResult)
+		archive := make(map[string]lob.QueryArchiveResult)
 		now := utils.TimeNow(utcOffset)
 		var err error
 
-		archive["-7:-2"], err = ctx.App.QueryArchive(lib.QueryArchiveArgs{
+		archive["-7:-2"], err = ctx.App.QueryArchive(lob.QueryArchiveArgs{
 			User:     user.Id,
 			DateFrom: now.AddDate(0, 0, -7),
 			DateTo:   now.AddDate(0, 0, -2),
 		})
 		ctx.CatchError(err)
 
-		archive["-30:-2"], err = ctx.App.QueryArchive(lib.QueryArchiveArgs{
+		archive["-30:-2"], err = ctx.App.QueryArchive(lob.QueryArchiveArgs{
 			User:     user.Id,
 			DateFrom: now.AddDate(0, 0, -30),
 			DateTo:   now.AddDate(0, 0, -2),

@@ -3,11 +3,11 @@ package endpoints
 import (
 	"net/http"
 
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		user := ctx.ForceUser()
 		hasSites, err := user.HasSiteLinks()
 		ctx.CatchError(err)

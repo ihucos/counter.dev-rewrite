@@ -1,11 +1,11 @@
 package endpoints
 
 import (
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		subID := ctx.R.FormValue("subscription_id")
 		user := ctx.ForceUser()
 		err := user.RegisterSubscriptionID(subID)

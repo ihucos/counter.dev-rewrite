@@ -1,4 +1,4 @@
-package lib
+package lob
 
 import (
 	"github.com/gomodule/redigo/redis"

@@ -1,9 +1,9 @@
 package endpoints
 
-import "github.com/ihucos/counter.dev/lib"
+import "github.com/ihucos/counter.dev/lob"
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		user := ctx.ForceUser()
 		site := ctx.R.FormValue("site")
 		confirmSite := ctx.R.FormValue("confirmSite")

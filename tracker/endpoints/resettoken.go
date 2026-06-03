@@ -1,9 +1,9 @@
 package endpoints
 
-import "github.com/ihucos/counter.dev/lib"
+import "github.com/ihucos/counter.dev/lob"
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		user := ctx.ForceUser()
 		err := user.ResetToken()
 		ctx.CatchError(err)

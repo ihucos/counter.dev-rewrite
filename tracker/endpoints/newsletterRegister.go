@@ -2,10 +2,10 @@ package endpoints
 
 import "net/mail"
 
-import "github.com/ihucos/counter.dev/lib"
+import "github.com/ihucos/counter.dev/lob"
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		userMail := ctx.R.FormValue("mail")
 		_, err := mail.ParseAddress(userMail)
 		if err != nil {

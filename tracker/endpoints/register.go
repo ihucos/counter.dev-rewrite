@@ -3,12 +3,12 @@ package endpoints
 import (
 	"fmt"
 
-	"github.com/ihucos/counter.dev/lib"
+	"github.com/ihucos/counter.dev/lob"
 	"github.com/ihucos/counter.dev/models"
 )
 
 func init() {
-	lib.Endpoint(lib.EndpointName(), func(ctx *lib.Ctx) {
+	lob.Endpoint(lob.EndpointName(), func(ctx *lob.Ctx) {
 		userId := ctx.R.FormValue("user")
 		mail := ctx.R.FormValue("mail")
 		password := ctx.R.FormValue("password")
