@@ -23,31 +23,22 @@ func originToSiteID(origin string) string {
 	return m[1]
 }
 
-func handleTrack(pool *redis.Pool, cfg Config) http.HandlerFunc {
+func handleTrack(pool *redis.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn := pool.Get()
 		defer conn.Close()
 
-		// Resolve user
-		var user User
-		uuid := r.FormValue("id")
-		if uuid != "" {
-			var err error
-			user, err = NewUserByCachedUUID(conn, uuid, cfg.PasswordSalt)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-		} else {
-			userID := r.FormValue("user")
-			if userID == "" {
-				userID = r.FormValue("site")
-				if userID == "" {
+		// Resolve id value
+		idVal := r.FormValue("id")
+		if idVal == "" {
+			idVal = r.FormValue("user")
+			if idVal == "" {
+				idVal = r.FormValue("site")
+				if idVal == "" {
 					http.Error(w, "missing site param", http.StatusBadRequest)
 					return
 				}
 			}
-			user = NewUser(conn, userID, cfg.PasswordSalt)
 		}
 
 		now := LocalTime(parseUTCOffset(r, "utcoffset"))
@@ -130,13 +121,11 @@ func handleTrack(pool *redis.Pool, cfg Config) http.HandlerFunc {
 
 		// Persist
 		logLine := fmt.Sprintf("[%s] %s %s %s %s", now.Format("2006-01-02 15:04:05"), country, refParam, v.Device, v.Platform)
-		siteID := originToSiteID(origin)
+		originSiteID := originToSiteID(origin)
 
-		site := user.NewSite(siteID)
+		site := NewSite(conn, idVal, originSiteID)
 		site.SaveVisit(v, now)
 		site.Log(logLine)
-		user.IncrSiteLink(siteID)
-		user.Signal()
 
 		conn.Flush()
 
@@ -147,14 +136,15 @@ func handleTrack(pool *redis.Pool, cfg Config) http.HandlerFunc {
 	}
 }
 
-func handleTrackPage(pool *redis.Pool, cfg Config) http.HandlerFunc {
+func handleTrackPage(pool *redis.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn := pool.Get()
 		defer conn.Close()
 
-		user, err := NewUserByCachedUUID(conn, r.FormValue("id"), cfg.PasswordSalt)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		// id param is required for handleTrackPage
+		idVal := r.FormValue("id")
+		if idVal == "" {
+			http.Error(w, "missing id param", http.StatusBadRequest)
 			return
 		}
 
@@ -165,9 +155,6 @@ func handleTrackPage(pool *redis.Pool, cfg Config) http.HandlerFunc {
 			Date:  now.Format("2006-01-02"),
 			Hour:  fmt.Sprintf("%d", now.Hour()),
 		}
-		// Count is stored as "pageview" in the "page" field
-		// The original code used visit["count"]="pageview" which was unused in SaveVisit
-		// We keep page field for the zet tracking
 
 		origin := r.Header.Get("Origin")
 		if origin == "" || origin == "null" {
@@ -175,8 +162,9 @@ func handleTrackPage(pool *redis.Pool, cfg Config) http.HandlerFunc {
 			return
 		}
 
-		siteID := originToSiteID(origin)
-		site := user.NewSite(siteID)
+		originSiteID := originToSiteID(origin)
+
+		site := NewSite(conn, idVal, originSiteID)
 		site.SaveVisit(v, now)
 
 		conn.Flush()
@@ -203,6 +191,3 @@ func parseUTCOffset(r *http.Request, key string) int {
 	}
 	return offset
 }
-
-// StringTrimPrefix is needed because uasurfer types have this method.
-// It's defined on the uasurfer package types. We just reference it.

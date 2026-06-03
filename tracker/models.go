@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -12,10 +11,10 @@ import (
 )
 
 const (
-	truncateAt      = 256
-	zetMaxSize      = 100
+	truncateAt        = 256
+	zetMaxSize        = 100
 	zetTrimEveryCalls = 100
-	loglinesKeep    = 30
+	loglinesKeep      = 30
 )
 
 var (
@@ -53,7 +52,7 @@ type Visit struct {
 // VisitItemKey represents a Redis key for visit data.
 type VisitItemKey struct {
 	TimeRange string
-	UserID    string
+	ID        string
 	Origin    string
 	Field     string
 }
@@ -61,7 +60,7 @@ type VisitItemKey struct {
 func (k VisitItemKey) String() string {
 	return fmt.Sprintf("v:%s,%s,%s,%s",
 		url.QueryEscape(k.Origin),
-		url.QueryEscape(k.UserID),
+		url.QueryEscape(k.ID),
 		url.QueryEscape(k.Field),
 		url.QueryEscape(k.TimeRange))
 }
@@ -76,7 +75,7 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	if err != nil {
 		return VisitItemKey{}, err
 	}
-	userID, err := url.QueryUnescape(parts[1])
+	id, err := url.QueryUnescape(parts[1])
 	if err != nil {
 		return VisitItemKey{}, err
 	}
@@ -88,7 +87,7 @@ func NewVisitItemKey(key string) (VisitItemKey, error) {
 	if err != nil {
 		return VisitItemKey{}, err
 	}
-	return VisitItemKey{Origin: origin, UserID: userID, Field: field, TimeRange: timeRange}, nil
+	return VisitItemKey{Origin: origin, ID: id, Field: field, TimeRange: timeRange}, nil
 }
 
 // RedisType returns whether this field is stored as a zet (sorted set) or hash.
@@ -106,49 +105,16 @@ func (k VisitItemKey) RedisType() string {
 	return ""
 }
 
-// User represents a tracked user backed by Redis.
-type User struct {
-	conn   redis.Conn
-	ID     string
-	salt   string
-}
-
-// NewUser creates a User with the given Redis connection and ID.
-func NewUser(conn redis.Conn, id, salt string) User {
-	return User{conn: conn, ID: truncate(id), salt: salt}
-}
-
-// NewUserByCachedUUID resolves a UUID to a user ID, caching in memory.
-func NewUserByCachedUUID(conn redis.Conn, uuid, salt string) (User, error) {
-	id, err := redis.String(conn.Do("HGET", "uuid2id", uuid))
-	if err == redis.ErrNil {
-		return User{}, fmt.Errorf("no such user with uuid: %s", uuid)
-	} else if err != nil {
-		return User{}, err
-	}
-	return NewUser(conn, id, salt), nil
-}
-
 // Site represents a tracked website for a user.
 type Site struct {
 	conn   redis.Conn
+	origin string
 	id     string
-	userID string
 }
 
-// NewSite creates a Site for the given user and site ID.
-func (u User) NewSite(id string) Site {
-	return Site{conn: u.conn, id: id, userID: u.ID}
-}
-
-// IncrSiteLink increments the site counter for the user.
-func (u User) IncrSiteLink(siteID string) {
-	u.conn.Send("HINCRBY", fmt.Sprintf("sites:%s", u.ID), siteID, 1)
-}
-
-// Signal publishes a signal for the user.
-func (u User) Signal() {
-	u.conn.Send("PUBLISH", fmt.Sprintf("user:%s", u.ID), "")
+// NewSite creates a Site for the given connection, id (from id/site param) and origin.
+func NewSite(conn redis.Conn, id, origin string) Site {
+	return Site{conn: conn, origin: origin, id: truncate(id)}
 }
 
 // SaveVisit persists a visit to Redis at multiple time granularities.
@@ -167,7 +133,7 @@ func (s Site) SaveVisit(v Visit, at time.Time) {
 
 // Log appends a log line for the site.
 func (s Site) Log(line string) {
-	key := fmt.Sprintf("log:%s:%s", s.id, s.userID)
+	key := fmt.Sprintf("log:%s:%s", s.origin, s.id)
 	s.conn.Send("ZADD", key, time.Now().Unix(), truncate(line))
 	s.conn.Send("ZREMRANGEBYRANK", key, 0, -loglinesKeep)
 }
@@ -178,7 +144,7 @@ func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 		if val == "" {
 			continue
 		}
-		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.id, UserID: s.userID}.String()
+		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, ID: s.id}.String()
 		s.conn.Send("ZINCRBY", key, 1, truncate(val))
 		if rand.Intn(zetTrimEveryCalls) == 0 {
 			s.conn.Send("ZREMRANGEBYRANK", key, 0, -zetMaxSize)
@@ -193,7 +159,7 @@ func (s Site) saveVisitPart(timeRange string, v Visit, expireAt time.Time) {
 		if val == "" {
 			continue
 		}
-		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.id, UserID: s.userID}.String()
+		key := VisitItemKey{TimeRange: timeRange, Field: field, Origin: s.origin, ID: s.id}.String()
 		s.conn.Send("HINCRBY", key, truncate(val), 1)
 		if !expireAt.IsZero() {
 			s.conn.Send("EXPIREAT", key, expireAt.Unix())
@@ -236,10 +202,4 @@ func truncate(s string) string {
 		return s[:truncateAt]
 	}
 	return s
-}
-
-// hashSalt hashes a string with a salt.
-func hashSalt(s, salt string) string {
-	h := sha256.Sum256([]byte(s + salt))
-	return string(h[:])
 }

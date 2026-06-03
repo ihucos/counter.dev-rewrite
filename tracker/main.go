@@ -18,14 +18,9 @@ func main() {
 		},
 	}
 
-	cfg := Config{
-		CookieSecret: env("WEBSTATS_COOKIE_SECRET"),
-		PasswordSalt: env("WEBSTATS_PASSWORD_SALT"),
-	}
-
 	mux := http.NewServeMux()
-	mux.HandleFunc("/track", handleTrack(pool, cfg))
-	mux.HandleFunc("/trackpage", handleTrackPage(pool, cfg))
+	mux.HandleFunc("/track", handleTrack(pool))
+	mux.HandleFunc("/trackpage", handleTrackPage(pool))
 
 	addr := bind
 	log.Println("Listening on", addr)
