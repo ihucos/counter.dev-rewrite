@@ -1,0 +1,47 @@
+#!/usr/bin/env uv run --script
+# /// script
+# dependencies = [
+#     "llm",
+#     "llm-tools-mcp",
+#     "claudia-agent",
+# ]
+# ///
+
+
+import tempfile
+import os
+
+from llm_tools_mcp.register_tools import MCP
+from claudia.backends.agent import run as claudia_run
+from claudia.backends.agent import CoderToolbox
+
+config = tempfile.NamedTemporaryFile()
+
+config.write(
+    b"""
+{
+	"mcpServers": {
+		"svelte": {
+			"command": "npx",
+			"args": ["-y", "@sveltejs/mcp"]
+		}
+	}
+}""")
+config.flush()
+
+
+SYSTEM_PROMPT = """
+You are a coding agent
+"""
+
+
+svelte_mcp_tool = MCP(config.name)
+
+
+
+def get_tools(*, workdir, devbox, ui, model):
+    os.chdir(workdir)
+    coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
+    return [svelte_mcp_tool, coder]
+
+claudia_run(get_tools=get_tools)
