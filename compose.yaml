@@ -1,8 +1,8 @@
 include:
-  - backend/compose.yaml
-  - tracker/compose.yaml
-  - redis/compose.yaml
-  - postgres/compose.yaml
+  - services/backend/compose.yaml
+  - services/tracker/compose.yaml
+  - services/redis/compose.yaml
+  - services/postgres/compose.yaml
 
 volumes:
   redis_data:
