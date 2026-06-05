@@ -4,7 +4,7 @@
 #     "llm",
 #     "llm-tools-mcp",
 #     "claudia-agent",
-#     "yaml",
+#     "pyyaml",
 # ]
 # ///
 
@@ -13,6 +13,7 @@ import tempfile
 import yaml
 import subprocess
 import os
+from pathlib import Path
 
 from llm_tools_mcp.register_tools import MCP
 from claudia.backends.agent import run as claudia_run
@@ -44,11 +45,24 @@ svelte_mcp_tool = MCP(config.name)
 
 def get_api_documentation() -> dict:
     with die():
+
+        # Find parent path with .git folder
+        project_dir = None
+        current_dir = Path.cwd().resolve()
+        for path in [current_dir] + list(current_dir.parents):
+            git_dir = path / ".git"
+            if git_dir.is_dir():
+                project_dir = path
+                break
+        if not project_dir:
+            raise Exception("Could not find git directory")
+
         doc_yaml = subprocess.run(
-            ["docker", "compose", "run", "--no-deps", "backend", "python3", "manage.py", "spectacular", "--format", "yaml"],
+            ["docker", "compose", "run", "--no-deps", "backend", "python3", "manage.py", "spectacular",],
             text=True,
             capture_output=True,
             check=True,
+            cwd=project_dir
         ).stdout
         return yaml.safe_load(doc_yaml)
 
