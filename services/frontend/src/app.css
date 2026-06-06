@@ -1,0 +1,97 @@
+@import url('../static/css/styles.css');
+
+/* Dashboard layout overrides */
+dashboard-selector,
+dashboard-addbtn,
+dashboard-download,
+counter-trackingcode,
+dashboard-dynamics,
+dashboard-graph,
+dashboard-settings,
+dashboard-counter-visitors,
+dashboard-counter-search,
+dashboard-counter-social,
+dashboard-counter-direct,
+#devices dashboard-pie,
+#platforms dashboard-pie,
+#browsers dashboard-pie,
+dashboard-sources-countries,
+dashboard-languages,
+dashboard-screens,
+dashboard-pages,
+dashboard-visits,
+dashboard-hour,
+dashboard-week,
+dashboard-time,
+dashboard-share-account {
+  display: block;
+}
+
+/* Query result styling */
+.query-result {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.query-result code {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Welcome page tab styling */
+.welcome-tabs {
+  margin-bottom: 24px;
+}
+
+.welcome-tabs .tabs-menu {
+  display: flex;
+  width: 100%;
+}
+
+.welcome-tabs .tabs-menu li {
+  flex: 1;
+  text-align: center;
+}
+
+/* Modal transitions */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.64);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay .modal {
+  background: #ffffff;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  margin: 24px;
+}
+
+/* Auth form spacing */
+.auth-form label {
+  margin-bottom: 16px;
+  display: block;
+}
+
+.auth-form .btn-primary {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* Loading state */
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+```
+
+```javascript--- a/services/frontend/src/hooks.server.js

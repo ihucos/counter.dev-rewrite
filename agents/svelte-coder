@@ -31,21 +31,28 @@ config.write(
 			"args": ["-y", "@sveltejs/mcp"]
 		}
 	}
-}""")
+}"""
+)
 config.flush()
 
 
-SYSTEM_PROMPT = """
-You are a coding agent
-"""
+# SYSTEM_PROMPT = """
+# You are a coding agent.
+#
+# Use the coder tool for the bigger changes. then the other tools to plish.
+#
+# This is the current project:
+# {project_map}
+# """
 
+
+SYSTEM_PROMPT = """You are  coding agent. Use the tools"""
 
 svelte_mcp_tool = MCP(config.name)
 
 
 def get_api_documentation() -> dict:
     with die():
-
         # Find parent path with .git folder
         project_dir = None
         current_dir = Path.cwd().resolve()
@@ -58,14 +65,22 @@ def get_api_documentation() -> dict:
             raise Exception("Could not find git directory")
 
         doc_yaml = subprocess.run(
-            ["docker", "compose", "run", "--no-deps", "backend", "python3", "manage.py", "spectacular",],
+            [
+                "docker",
+                "compose",
+                "run",
+                "--no-deps",
+                "backend",
+                "python3",
+                "manage.py",
+                "spectacular",
+            ],
             text=True,
             capture_output=True,
             check=True,
-            cwd=project_dir
+            cwd=project_dir,
         ).stdout
         return yaml.safe_load(doc_yaml)
-
 
 
 
@@ -73,6 +88,19 @@ def get_api_documentation() -> dict:
 def get_tools(*, workdir, devbox, ui, model):
     os.chdir(workdir)
     coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
-    return [svelte_mcp_tool, coder, get_api_documentation]
 
-claudia_run(get_tools=get_tools)
+    def cmd(bash_cmd: str):
+        with die(), ui.loading(bash_cmd):
+            compl = devbox.run(['sh', '-c', bash_cmd])
+            return {"exit_code": compl.returncode, "stdout": compl.stdout, "stderr": compl.stderr,}
+
+
+    return [
+        # svelte_mcp_tool,
+        # coder,
+        # get_api_documentation,
+        cmd
+    ]
+
+
+claudia_run(get_tools=get_tools, system_prompt=SYSTEM_PROMPT)
