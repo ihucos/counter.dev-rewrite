@@ -57,4 +57,4 @@ export const actions = {
     }
     throw redirect(303, '/');
   },
-};--- a/src/routes/dashboard/+page.svelte
+};

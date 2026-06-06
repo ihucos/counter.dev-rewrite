@@ -22,4 +22,4 @@ declare global {
     }
   }
 }
-export {};--- a/src/app.css
+export {};

@@ -98,4 +98,4 @@ export const actions = {
       return fail(400, { error: error.message || 'Password reset failed' });
     }
   },
-};--- a/src/routes/+page.svelte
+};

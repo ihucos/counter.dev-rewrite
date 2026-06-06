@@ -20,4 +20,4 @@
   { value: -8, label: 'PST' },
   { value: 1, label: 'CET' },
   { value: 8, label: 'CST' },
-]} />--- a/src/routes/+page.server.js
+]} />

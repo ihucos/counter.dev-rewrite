@@ -135,4 +135,4 @@
     padding-top: 1rem;
     border-top: 1px solid var(--color-border);
   }
-</style>--- a/src/routes/api/core/query/+server.js
+</style>

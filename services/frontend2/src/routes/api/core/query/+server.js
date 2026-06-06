@@ -13,4 +13,4 @@ export async function GET({ url, cookies }) {
   } catch (error) {
     return json({ error: error.message }, { status: 500 });
   }
-}--- a/src/routes/dashboard/+page.server.js
+}
