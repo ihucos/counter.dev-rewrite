@@ -68,7 +68,6 @@
   function selectRange(r) {
     range = r.key;
     if (r.days === null) {
-      // All time: omit date filters entirely
       startDate = '';
       endDate = '';
     } else if (r.days === 0) {
@@ -133,6 +132,36 @@
       console.error('Logout failed', e);
     }
   }
+
+  // Time helpers
+  const HOUR_LABELS = {
+    0: '12 a.m.', 1: '1 a.m.', 2: '2 a.m.', 3: '3 a.m.',
+    4: '4 a.m.', 5: '5 a.m.', 6: '6 a.m.', 7: '7 a.m.',
+    8: '8 a.m.', 9: '9 a.m.', 10: '10 a.m.', 11: '11 a.m.',
+    12: '12 noon', 13: '1 p.m.', 14: '2 p.m.', 15: '3 p.m.',
+    16: '4 p.m.', 17: '5 p.m.', 18: '6 p.m.', 19: '7 p.m.',
+    20: '8 p.m.', 21: '9 p.m.', 22: '10 p.m.', 23: '11 p.m.',
+  };
+
+  function getNormalizedHours(hours) {
+    if (!hours) return [];
+    const pad = Object.fromEntries([...Array(24).keys()].map(i => [HOUR_LABELS[i], 0]));
+    const formatted = Object.fromEntries(
+      Object.entries(hours).map(([k, v]) => [HOUR_LABELS[k] || k, v])
+    );
+    const merged = { ...pad, ...formatted };
+    return Object.entries(merged);
+  }
+
+  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function getNormalizedWeekdays(weekdayData) {
+    if (!weekdayData) return [];
+    return WEEKDAY_LABELS.map((label, idx) => {
+      const key = String(idx);
+      return [label, weekdayData[key] || 0];
+    });
+  }
 </script>
 
 <div class="dashboard">
@@ -196,11 +225,10 @@
       {#if queryLoading}
         <div class="loading-indicator">Loading data...</div>
       {:else if queryData && Object.keys(queryData).length > 0}
-        <!-- Summary Cards -->
         <section class="summary-cards">
           <div class="card">
             <div class="card-label">Pageviews</div>
-            <div class="card-value">{numberFormat(categoryTotal('pageview'))}</div>
+            <div class="card-value">{numberFormat(categoryTotal('page'))}</div>
           </div>
           <div class="card">
             <div class="card-label">Referrers</div>
@@ -216,9 +244,8 @@
           </div>
         </section>
 
-        <!-- Pages & Referrers -->
         <section class="metrics-grid">
-          {#if hasData('pageview')}
+          {#if hasData('page')}
           <div class="metrics-panel">
             <div class="metrics-headline">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -229,13 +256,13 @@
               <h3>Pages</h3>
             </div>
             <div class="metrics-list">
-              {#each getSortedEntries('pageview') as [item, count]}
+              {#each getSortedEntries('page') as [item, count]}
                 <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('pageview'))}%"></div>
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('page'))}%"></div>
                   <div class="bar-row-inner">
                     <span class="bar-label">{item}</span>
                     <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('pageview'))}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('page'))}</span>
                   </div>
                 </div>
               {/each}
@@ -270,7 +297,6 @@
           {/if}
         </section>
 
-        <!-- Countries & Browsers -->
         <section class="metrics-grid">
           {#if hasData('country')}
           <div class="metrics-panel">
@@ -323,7 +349,6 @@
           {/if}
         </section>
 
-        <!-- OS & Device -->
         <section class="metrics-grid">
           {#if hasData('platform')}
           <div class="metrics-panel">
@@ -368,6 +393,106 @@
                     <span class="bar-label">{item}</span>
                     <span class="bar-value">{numberFormat(count)}</span>
                     <span class="bar-pct">{percentLabel(count, categoryTotal('device'))}</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+        </section>
+
+        <section class="metrics-grid">
+          {#if hasData('lang')}
+          <div class="metrics-panel">
+            <div class="metrics-headline">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3.00003H13C15.0843 3.11502 17.053 3.99479 18.5291 5.47089C20.0052 6.94699 20.885 8.91568 21 11V11.5Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <h3>Languages</h3>
+            </div>
+            <div class="metrics-list">
+              {#each getSortedEntries('lang') as [item, count]}
+                <div class="bar-row">
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('lang'))}%"></div>
+                  <div class="bar-row-inner">
+                    <span class="bar-label">{item}</span>
+                    <span class="bar-value">{numberFormat(count)}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('lang'))}</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+
+          {#if hasData('screen')}
+          <div class="metrics-panel">
+            <div class="metrics-headline">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M8 3H5C4.46957 3 3.96086 3.21071 3.58579 3.58579C3.21071 3.96086 3 4.46957 3 5V8M21 8V5C21 4.46957 20.7893 3.96086 20.4142 3.58579C20.0391 3.21071 19.5304 3 19 3H16M16 21H19C19.5304 21 20.0391 20.7893 20.4142 20.4142C20.7893 20.0391 21 19.5304 21 19V16M3 16V19C3 19.5304 3.21071 20.0391 3.58579 20.4142C3.96086 20.7893 4.46957 21 5 21H8" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <h3>Screens</h3>
+            </div>
+            <div class="metrics-list">
+              {#each getSortedEntries('screen') as [item, count]}
+                <div class="bar-row">
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('screen'))}%"></div>
+                  <div class="bar-row-inner">
+                    <span class="bar-label">{item}</span>
+                    <span class="bar-value">{numberFormat(count)}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('screen'))}</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+        </section>
+
+        <section class="metrics-grid">
+          {#if hasData('hour')}
+          <div class="metrics-panel">
+            <div class="metrics-headline">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 6V12L16 14" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <h3>Hour</h3>
+            </div>
+            <div class="metrics-list">
+              {#each getNormalizedHours(queryData.hour) as [label, count]}
+                <div class="bar-row">
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('hour'))}%"></div>
+                  <div class="bar-row-inner">
+                    <span class="bar-label">{label}</span>
+                    <span class="bar-value">{numberFormat(count)}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('hour'))}</span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+          {/if}
+
+          {#if hasData('weekday')}
+          <div class="metrics-panel">
+            <div class="metrics-headline">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16 2V6" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 2V6" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3 10H21" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <h3>Day of Week</h3>
+            </div>
+            <div class="metrics-list">
+              {#each getNormalizedWeekdays(queryData.weekday) as [label, count]}
+                <div class="bar-row">
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('weekday'))}%"></div>
+                  <div class="bar-row-inner">
+                    <span class="bar-label">{label}</span>
+                    <span class="bar-value">{numberFormat(count)}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('weekday'))}</span>
                   </div>
                 </div>
               {/each}
