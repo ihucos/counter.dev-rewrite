@@ -9,6 +9,7 @@
   import RecentVisits from '$lib/RecentVisits.svelte';
   import TrafficSources from '$lib/TrafficSources.svelte';
   import TimeSection from '$lib/TimeSection.svelte';
+  import SourcesCountries from '$lib/SourcesCountries.svelte';
 
   let hosts = $state([]);
   let selectedHostId = $state(null);
@@ -337,10 +338,12 @@
           <MetricsPanel title="Page Paths" icon={ICONS.loc} data={queryData['loc'] ?? {}} />
         </section>
 
-        <!-- Metrics panels: referrers, countries -->
-        <section class="metrics-grid">
-          <MetricsPanel title="Referrers" icon={ICONS.ref} data={queryData['ref'] ?? {}} />
-          <MetricsPanel title="Countries" icon={ICONS.country} data={queryData['country'] ?? {}} />
+        <!-- Sources & Countries - enhanced panel with grouping, flags, and view-all modals -->
+        <section class="sources-countries-section">
+          <SourcesCountries
+            refData={queryData['ref'] ?? {}}
+            countryData={queryData['country'] ?? {}}
+          />
         </section>
 
         <!-- Metrics panels: browsers, operating systems -->
@@ -438,6 +441,11 @@
   .chart-section { margin-top: 24px; }
 
   .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px; }
+
+  .sources-countries-section {
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
 
   .recent-visits-section {
     margin-top: 24px;
