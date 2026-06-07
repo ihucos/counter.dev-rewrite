@@ -84,6 +84,7 @@ def get_api_documentation() -> dict:
 
 
 
+breakpoint()
 
 def get_tools(*, workdir, devbox, ui, model):
     os.chdir(workdir)
@@ -98,7 +99,7 @@ def get_tools(*, workdir, devbox, ui, model):
     return [
         # svelte_mcp_tool,
         # coder,
-        # get_api_documentation,
+        get_api_documentation,
         cmd
     ]
 

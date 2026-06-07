@@ -1,0 +1,53 @@
+#!/usr/bin/env uv run --script
+# /// script
+# dependencies = [
+#     "llm",
+#     "llm-tools-mcp",
+#     "claudia-agent",
+#     "pyyaml",
+# ]
+# ///
+
+
+from pathlib import Path
+
+from llm_tools_mcp.register_tools import MCP
+from claudia.backends.agent import run as claudia_run
+from claudia.backends.agent import CoderToolbox
+from claudia.backends.agent import die
+from claudia.utils import get_project_files, get_project_map
+
+
+
+SYSTEM_PROMPT = f"""
+You are a planning agent.
+
+# Task
+Break up the given task into standalone subtasks that can be worked trough sequentially.
+When finished reasoning, call the submit_tasks(tool)
+
+# Project map
+{get_project_map()}
+
+""".strip()
+
+
+def submit_tasks(tasks: list[str]) -> None:
+    for task in tasks:
+        print("====")
+        print(task)
+
+def get_tools(*, workdir, devbox, ui, model):
+
+
+    coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
+
+
+    return [
+        # svelte_mcp_tool,
+        # coder,
+        coder.read_files,
+    ]
+
+
+claudia_run(get_tools=get_tools, system_prompt=SYSTEM_PROMPT)
