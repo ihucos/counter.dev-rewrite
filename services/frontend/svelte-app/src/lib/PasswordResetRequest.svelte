@@ -8,6 +8,10 @@
   let loading = $state(false);
   let success = $state(false);
 
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
+
   async function handleRequestReset() {
     error = '';
     loading = true;
@@ -15,6 +19,7 @@
       // dj_rest_auth PasswordResetView expects 'email' field
       await api.requestPasswordReset({ email });
       success = true;
+      flash('Password reset email sent if account exists.', 'success');
     } catch (e) {
       error = e.message || 'Request failed';
       if (e.data && typeof e.data === 'object') {

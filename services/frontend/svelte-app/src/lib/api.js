@@ -14,6 +14,7 @@
  *   /api/core/hosts/              - GET, POST (DRF ViewSet)
  *   /api/core/hosts/:id/          - GET, PATCH, DELETE (DRF ViewSet)
  *   /api/core/query/?site=X&...   - GET   (custom view)
+ *   /api/core/logs/               - GET   (recent visit logs)
  */
 
 const API_BASE = '/api';
@@ -158,6 +159,13 @@ const api = {
       site,
       start_date: startDate || undefined,
       end_date: endDate || undefined,
+    }));
+  },
+
+  getLogs: (site, limit) => {
+    return request('GET', buildUrl('/core/logs/', {
+      site: site || undefined,
+      limit: limit || undefined,
     }));
   },
 };

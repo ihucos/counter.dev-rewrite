@@ -8,11 +8,16 @@
   let error = $state('');
   let loading = $state(false);
 
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
+
   async function handleLogin() {
     error = '';
     loading = true;
     try {
       await api.login(username, password);
+      flash('Welcome back!', 'success');
       // Dispatch custom event so App.svelte can react
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: true } }));
     } catch (e) {

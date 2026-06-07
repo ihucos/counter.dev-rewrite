@@ -11,6 +11,10 @@
   let loading = $state(false);
   let success = $state(false);
 
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
+
   function getUTCOffset() {
     return Math.round((-1 * new Date().getTimezoneOffset()) / 60);
   }
@@ -26,6 +30,7 @@
         password2,
         timezone: getUTCOffset(),
       });
+      flash('Account created! Welcome to Counter.', 'success');
       // Registration success - dispatch auth event so App.svelte transitions
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: true } }));
     } catch (e) {

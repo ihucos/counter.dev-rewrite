@@ -14,6 +14,10 @@
   let success = $state(false);
   let parsed = $state(false);
 
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
+
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
     uid = params.get('uid') || '';
@@ -33,6 +37,7 @@
         new_password2: newPassword2,
       });
       success = true;
+      flash('Password has been reset successfully!', 'success');
     } catch (e) {
       error = e.message || 'Failed to reset password';
       if (e.data && typeof e.data === 'object') {

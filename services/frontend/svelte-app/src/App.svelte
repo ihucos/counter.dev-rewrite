@@ -6,6 +6,7 @@
   import Dashboard from '$lib/Dashboard.svelte';
   import PasswordResetRequest from '$lib/PasswordResetRequest.svelte';
   import PasswordResetConfirm from '$lib/PasswordResetConfirm.svelte';
+  import Flash from '$lib/Flash.svelte';
 
   let isAuthenticated = $state(false);
   let checkingAuth = $state(true);
@@ -48,6 +49,8 @@
     return () => window.removeEventListener('auth-changed', handleAuthChanged);
   });
 </script>
+
+<Flash />
 
 {#if checkingAuth}
   <div class="loading-screen">

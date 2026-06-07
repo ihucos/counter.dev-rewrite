@@ -1,11 +1,12 @@
 <script>
   import { api } from '$lib/api.js';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import Settings from '$lib/Settings.svelte';
   import MetricsPanel from '$lib/MetricsPanel.svelte';
   import TimeSeriesChart from '$lib/TimeSeriesChart.svelte';
   import DownloadCSV from '$lib/DownloadCSV.svelte';
   import ConnectionStatus from '$lib/ConnectionStatus.svelte';
+  import RecentVisits from '$lib/RecentVisits.svelte';
 
   let hosts = $state([]);
   let selectedHostId = $state(null);
@@ -20,6 +21,17 @@
   let error = $state('');
   let user = $state(null);
   let connectionStatus = $state('checking');
+  let lastRefresh = $state(null);
+
+  let visitLogs = $state([]);
+  let logsLoading = $state(false);
+
+  const REFRESH_INTERVAL_MS = 15000;
+  let refreshTimer = null;
+
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
 
   function today() {
     const d = new Date();
@@ -43,6 +55,23 @@
     { key: 'all', label: 'All time', days: null },
   ];
 
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshTimer = setInterval(() => {
+      if (selectedHostName) {
+        loadQueryData(true);
+        loadLogs(true);
+      }
+    }, REFRESH_INTERVAL_MS);
+  }
+
+  function stopAutoRefresh() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+  }
+
   async function checkConnection() {
     connectionStatus = 'connecting';
     try {
@@ -53,15 +82,18 @@
     }
   }
 
-  async function refreshHosts() {
+  async function loadLogs(silent = false) {
+    if (!silent) logsLoading = true;
     try {
-      hosts = await api.getHosts();
-      if (hosts.length > 0 && !hosts.find(h => h.id === selectedHostId)) {
-        selectedHostId = hosts[0].id;
-        await loadQueryData();
+      const result = await api.getLogs(selectedHostName || undefined, 50);
+      visitLogs = result?.logs ?? [];
+      if (result?.logs?.length > 0) {
+        connectionStatus = 'connected';
       }
     } catch (e) {
-      console.error('Failed to refresh hosts', e);
+      if (!silent) console.error('Failed to load visit logs', e);
+    } finally {
+      if (!silent) logsLoading = false;
     }
   }
 
@@ -72,9 +104,13 @@
       hosts = await api.getHosts();
       if (hosts.length > 0) {
         selectedHostId = hosts[0].id;
-        await loadQueryData();
+        await Promise.all([
+          loadQueryData(),
+          loadLogs(),
+        ]);
       }
       connectionStatus = 'connected';
+      startAutoRefresh();
     } catch (e) {
       error = e.message || 'Failed to load data';
       connectionStatus = 'disconnected';
@@ -83,21 +119,29 @@
     }
   });
 
-  async function loadQueryData() {
+  onDestroy(() => {
+    stopAutoRefresh();
+  });
+
+  async function loadQueryData(silent = false) {
     if (!selectedHostName) return;
-    queryLoading = true;
-    queryData = null;
+    if (!silent) queryLoading = true;
     try {
       queryData = await api.query(
         selectedHostName,
         startDate || undefined,
         endDate || undefined
       );
+      lastRefresh = new Date();
+      connectionStatus = 'connected';
     } catch (e) {
       console.error('Query failed', e);
-      queryData = null;
+      if (!silent) {
+        queryData = null;
+        connectionStatus = 'disconnected';
+      }
     } finally {
-      queryLoading = false;
+      if (!silent) queryLoading = false;
     }
   }
 
@@ -122,6 +166,7 @@
   function selectHost(id) {
     selectedHostId = id;
     loadQueryData();
+    loadLogs();
   }
 
   function categoryTotal(category) {
@@ -140,6 +185,11 @@
     if (!event.detail.authenticated) {
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: false } }));
     }
+  }
+
+  function formatRefreshTime(date) {
+    if (!date) return '';
+    return date.toLocaleTimeString();
   }
 
   const ICONS = {
@@ -184,6 +234,7 @@
     );
   }
 </script>
+
 <div class="dashboard">
   <nav class="navbar">
     <div class="content">
@@ -261,6 +312,13 @@
       {#if queryLoading}
         <div class="loading-indicator">Loading data...</div>
       {:else if queryData && Object.keys(queryData).length > 0}
+        <div class="refresh-indicator">
+          {#if lastRefresh}
+            <span class="refresh-time">Last updated: {formatRefreshTime(lastRefresh)}</span>
+          {/if}
+          <span class="refresh-badge">Auto-refreshing</span>
+        </div>
+
         <section class="summary-cards">
           <div class="card">
             <div class="card-label">Pageviews</div>
@@ -318,6 +376,10 @@
           <div></div>
         </section>
 
+        <RecentVisits
+          logs={visitLogs}
+          hostName={selectedHostName ?? ''}
+        />
       {:else if !queryLoading}
         <div class="empty-data">No data available for this period.</div>
       {/if}
@@ -344,6 +406,29 @@
   .empty-state p { color: #666; font-size: 16px; }
   .empty-state .small { font-size: 14px; color: #999; }
   .empty-data { text-align: center; padding: 60px 24px; color: #666; font-size: 16px; }
+
+  .refresh-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    margin-bottom: 4px;
+  }
+  .refresh-time {
+    font-size: 11px;
+    color: #999;
+  }
+  .refresh-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: #d1fae5;
+    color: #065f46;
+    font-weight: 600;
+  }
 
   .toolbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; position: sticky; top: 53px; z-index: 99; }
   .toolbar-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }

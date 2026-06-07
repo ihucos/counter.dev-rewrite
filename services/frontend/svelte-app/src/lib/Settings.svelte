@@ -35,17 +35,21 @@
   let hideHostsPref = $state(false);
   let hidingHostsSaving = $state(false);
 
+  function flash(message, type = 'info') {
+    window.dispatchEvent(new CustomEvent('flash', { detail: { message, type } }));
+  }
+
   const TIMEZONES = [
     { offset: -12, label: '[UTC-12:00] United States Minor Outlying Islands' },
     { offset: -11, label: '[UTC-11:00] United States Minor Outlying Islands' },
     { offset: -10, label: '[UTC-10:00] Honolulu' },
     { offset: -9, label: '[UTC-09:00] Anchorage' },
     { offset: -8, label: '[UTC-08:00] Los Angeles, Vancouver, Tijuana' },
-    { offset: -7, label: '[UTC-07:00] Denver, Edmonton, Ciudad Juárez' },
+    { offset: -7, label: '[UTC-07:00] Denver, Edmonton, Ciudad Ju\u00e1rez' },
     { offset: -6, label: '[UTC-06:00] Mexico City, Chicago, Guatemala City' },
-    { offset: -5, label: '[UTC-05:00] New York, Toronto, Bogotá' },
+    { offset: -5, label: '[UTC-05:00] New York, Toronto, Bogot\u00e1' },
     { offset: -4, label: '[UTC-04:00] Santiago, Santo Domingo, Manaus' },
-    { offset: -3, label: '[UTC-03:00] São Paulo, Buenos Aires, Montevideo' },
+    { offset: -3, label: '[UTC-03:00] S\u00e3o Paulo, Buenos Aires, Montevideo' },
     { offset: -2, label: '[UTC-02:00] Fernando de Noronha' },
     { offset: -1, label: '[UTC-01:00] Cape Verde, Azores islands' },
     { offset: 0, label: '[UTC+00:00] London, Dublin, Lisbon' },
@@ -59,7 +63,7 @@
     { offset: 8, label: '[UTC+08:00] Shanghai, Taipei, Kuala Lumpur' },
     { offset: 9, label: '[UTC+09:00] Tokyo, Seoul, Pyongyang, Ambon' },
     { offset: 10, label: '[UTC+10:00] Sydney, Port Moresby, Vladivostok' },
-    { offset: 11, label: '[UTC+11:00] Nouméa, Magadan' },
+    { offset: 11, label: '[UTC+11:00] Noum\u00e9a, Magadan' },
     { offset: 12, label: '[UTC+12:00] Auckland, Suva, Petropavlovsk-Kamchatsky' },
     { offset: 13, label: '[UTC+13:00] Phoenix Islands, Samoa' },
     { offset: 14, label: '[UTC+14:00] Line Islands' },
@@ -96,6 +100,7 @@
     try {
       await navigator.clipboard.writeText(trackingCode);
       copySuccess = true;
+      flash('Tracking code copied to clipboard!', 'success');
       setTimeout(() => { copySuccess = false; }, 2000);
     } catch {
       const ta = document.createElement('textarea');
@@ -105,6 +110,7 @@
       document.execCommand('copy');
       document.body.removeChild(ta);
       copySuccess = true;
+      flash('Tracking code copied to clipboard!', 'success');
       setTimeout(() => { copySuccess = false; }, 2000);
     }
   }
@@ -113,7 +119,9 @@
     try {
       await api.updateHost(host.id, { hide: !host.hide });
       host.hide = !host.hide;
+      flash(`Website "${host.name}" is now ${host.hide ? 'hidden' : 'visible'}`, 'success');
     } catch (e) {
+      flash('Failed to update website visibility', 'error');
       console.error('Failed to update host visibility', e);
     }
   }
@@ -128,8 +136,10 @@
       hosts.push(newHost);
       hostForTracking = newHost.name;
       newSiteName = '';
+      flash(`Website "${trimmed}" added successfully!`, 'success');
     } catch (e) {
       addSiteError = e.message || 'Failed to add website';
+      flash(e.message || 'Failed to add website', 'error');
     } finally {
       addingSite = false;
     }
@@ -146,7 +156,9 @@
       if (hostForTracking === host.name) {
         hostForTracking = hosts.length > 0 ? hosts[0].name : null;
       }
+      flash(`Website "${host.name}" has been deleted.`, 'success');
     } catch (e) {
+      flash('Failed to delete website', 'error');
       console.error('Failed to delete host', e);
     }
   }
@@ -180,11 +192,13 @@
         new_password2: repeatNewPassword,
       });
       passwordSuccess = 'Password changed successfully.';
+      flash('Password changed successfully!', 'success');
       currentPassword = '';
       newPassword = '';
       repeatNewPassword = '';
     } catch (e) {
       passwordError = e.message || 'Failed to change password.';
+      flash(e.message || 'Failed to change password', 'error');
     } finally {
       changingPassword = false;
     }
@@ -199,8 +213,10 @@
         user.timezone = updated.timezone ?? selectedTimezone;
       }
       timezoneSaved = true;
+      flash('Timezone saved!', 'success');
       setTimeout(() => { timezoneSaved = false; }, 2500);
     } catch (e) {
+      flash('Failed to save timezone', 'error');
       console.error('Failed to save timezone', e);
     } finally {
       savingTimezone = false;
@@ -216,7 +232,9 @@
         user.hide_hosts = updated.hide_hosts ?? newValue;
       }
       hideHostsPref = user?.hide_hosts ?? newValue;
+      flash(`Hidden websites will ${newValue ? 'now' : 'no longer'} be filtered out.`, 'info');
     } catch (e) {
+      flash('Failed to update preference', 'error');
       console.error('Failed to update hide_hosts preference', e);
     } finally {
       hidingHostsSaving = false;
@@ -226,9 +244,12 @@
   async function handleLogout() {
     try {
       await api.logout();
+      flash('You have been signed out.', 'info');
       onauthChanged({ authenticated: false });
     } catch (e) {
       console.error('Logout failed', e);
+      // Logout locally even if API call fails
+      onauthChanged({ authenticated: false });
     }
   }
 </script>
