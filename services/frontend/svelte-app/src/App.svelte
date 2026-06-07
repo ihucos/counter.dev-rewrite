@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { getUser } from '$lib/api.js';
+  import { api } from '$lib/api.js';
   import Login from '$lib/Login.svelte';
   import Dashboard from '$lib/Dashboard.svelte';
 
@@ -10,7 +10,7 @@
   onMount(async () => {
     // Check if user is already authenticated
     try {
-      await getUser();
+      await api.getUser();
       isAuthenticated = true;
     } catch {
       isAuthenticated = false;

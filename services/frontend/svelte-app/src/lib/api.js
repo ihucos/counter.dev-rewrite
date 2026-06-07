@@ -29,7 +29,9 @@ async function request(method, path, body) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const msg = errorData.detail || (errorData.non_field_errors && errorData.non_field_errors[0]) || 'HTTP ' + response.status;
+    const msg = errorData.detail
+      || (errorData.non_field_errors && errorData.non_field_errors[0])
+      || 'HTTP ' + response.status;
     const error = new Error(msg);
     error.status = response.status;
     error.data = errorData;
@@ -66,10 +68,12 @@ const api = {
     request('PATCH', '/core/hosts/' + id + '/', data),
 
   query: (site, startDate, endDate) => {
-    var params = '?site=' + encodeURIComponent(site);
-    if (startDate) params += '&start_date=' + encodeURIComponent(startDate);
-    if (endDate) params += '&end_date=' + encodeURIComponent(endDate);
-    return request('GET', '/core/query/' + params);
+    const params = new URLSearchParams();
+    params.set('site', site);
+    if (startDate) params.set('start_date', startDate);
+    if (endDate) params.set('end_date', endDate);
+    const qs = params.toString();
+    return request('GET', '/core/query/' + (qs ? '?' + qs : ''));
   },
 };
 

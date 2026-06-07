@@ -50,8 +50,13 @@
   async function loadQueryData() {
     if (!selectedHost) return;
     queryLoading = true;
+    queryData = null;
     try {
-      queryData = await api.query(selectedHost, startDate, endDate);
+      queryData = await api.query(
+        selectedHost,
+        startDate || undefined,
+        endDate || undefined
+      );
     } catch (e) {
       console.error('Query failed', e);
       queryData = null;
@@ -63,6 +68,7 @@
   function selectRange(r) {
     range = r.key;
     if (r.days === null) {
+      // All time: omit date filters entirely
       startDate = '';
       endDate = '';
     } else if (r.days === 0) {
@@ -194,7 +200,7 @@
         <section class="summary-cards">
           <div class="card">
             <div class="card-label">Pageviews</div>
-            <div class="card-value">{numberFormat(categoryTotal('page'))}</div>
+            <div class="card-value">{numberFormat(categoryTotal('pageview'))}</div>
           </div>
           <div class="card">
             <div class="card-label">Referrers</div>
@@ -212,7 +218,7 @@
 
         <!-- Pages & Referrers -->
         <section class="metrics-grid">
-          {#if hasData('page')}
+          {#if hasData('pageview')}
           <div class="metrics-panel">
             <div class="metrics-headline">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -223,13 +229,13 @@
               <h3>Pages</h3>
             </div>
             <div class="metrics-list">
-              {#each getSortedEntries('page') as [item, count]}
+              {#each getSortedEntries('pageview') as [item, count]}
                 <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('page'))}%"></div>
+                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('pageview'))}%"></div>
                   <div class="bar-row-inner">
                     <span class="bar-label">{item}</span>
                     <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('page'))}</span>
+                    <span class="bar-pct">{percentLabel(count, categoryTotal('pageview'))}</span>
                   </div>
                 </div>
               {/each}
@@ -370,7 +376,7 @@
           {/if}
         </section>
 
-      {:else}
+      {:else if !queryLoading}
         <div class="empty-data">No data available for this period.</div>
       {/if}
     </main>
