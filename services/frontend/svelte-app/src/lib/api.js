@@ -9,11 +9,11 @@
  *   /api/auth/password/change/    - POST  (dj_rest_auth PasswordChangeView)
  *   /api/auth/password/reset/     - POST  (dj_rest_auth PasswordResetView)
  *   /api/auth/password/reset/confirm/ - POST  (dj_rest_auth PasswordResetConfirmView)
- *   /api/auth/registration/       - POST  (dj_rest_auth.registration)
- *   /api/auth/registration/verify-email/ - POST  (dj_rest_auth.registration)
+ *   /api/auth/registration/       - POST  (dj_rest_auth.registration RegisterView)
+ *   /api/auth/registration/verify-email/ - POST  (dj_rest_auth.registration VerifyEmailView)
  *   /api/core/hosts/              - GET, POST (DRF ViewSet)
  *   /api/core/hosts/:id/          - GET, PATCH, DELETE (DRF ViewSet)
- *   /api/core/query/?site=X&...   - GET   (custom view)
+ *   /api/core/query/?site=X&...   - GET   (custom query view)
  *   /api/core/logs/?site=X&...    - GET   (custom view, visit logs from Redis)
  */
 
@@ -42,9 +42,11 @@ function parseErrorData(errorData, status) {
   const messages = [];
   for (const [field, errors] of Object.entries(errorData)) {
     if (Array.isArray(errors)) {
-      messages.push(field + ': ' + errors.join(', '));
+      const displayField = field.replace(/_/g, ' ');
+      const label = displayField.charAt(0).toUpperCase() + displayField.slice(1);
+      messages.push(label + ': ' + errors.join(', '));
     } else if (typeof errors === 'string') {
-      messages.push(field + ': ' + errors);
+      messages.push(errors);
     }
   }
   if (messages.length > 0) {
@@ -123,6 +125,9 @@ const api = {
 
   register: (data) =>
     request('POST', '/auth/registration/', data),
+
+  verifyEmail: (data) =>
+    request('POST', '/auth/registration/verify-email/', data),
 
   getUser: () =>
     request('GET', '/auth/user/'),

@@ -92,7 +92,7 @@ def get_tools(*, workdir, devbox, ui, model):
         # coder,
         coder.read_files,
         coder.write_file,
-        get_api_documentation,
+        # get_api_documentation,
         cmd,
     ]
 
@@ -103,7 +103,7 @@ for i in range(10):
         get_tools=get_tools,
         system_prompt=SYSTEM_PROMPT,
         # prompt="You are currently at the monumental task of rewriting the frontend into svelte and migrating to the changed API. Get a rough idea of where we currently are there, plan one next step and then implement that small step. Do cleanups if it is necessary.")
-        prompt="You are currently rewriting the frontend into svelte and migrating to the changed API. Implement one step towards this goal.")
+        prompt="You are currently rewriting the frontend into svelte and migrating to the changed API. What is still missing? Implement one step towards this goal.")
 
 
 

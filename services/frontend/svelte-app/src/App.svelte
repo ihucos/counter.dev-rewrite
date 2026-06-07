@@ -6,11 +6,12 @@
   import Dashboard from '$lib/Dashboard.svelte';
   import PasswordResetRequest from '$lib/PasswordResetRequest.svelte';
   import PasswordResetConfirm from '$lib/PasswordResetConfirm.svelte';
+  import VerifyEmail from '$lib/VerifyEmail.svelte';
   import Flash from '$lib/Flash.svelte';
 
   let isAuthenticated = $state(false);
   let checkingAuth = $state(true);
-  let currentPage = $state('login'); // 'login' | 'register' | 'reset-request' | 'reset-confirm'
+  let currentPage = $state('login');
 
   async function checkAuth() {
     try {
@@ -24,27 +25,32 @@
   }
 
   function navigateTo(page) {
+    if (page === 'login' || page === 'register' || page === 'reset-request') {
+      const url = new URL(window.location);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
     currentPage = page;
   }
 
   function handleAuthChanged(e) {
     isAuthenticated = e.detail.authenticated;
     if (e.detail.authenticated) {
-      // Re-check auth state to ensure fresh CSRF tokens
       checkAuth();
     }
   }
 
   onMount(() => {
-    // If URL has uid and token params, show reset confirm page
     const params = new URLSearchParams(window.location.search);
+
     if (params.get('uid') && params.get('token')) {
       currentPage = 'reset-confirm';
+    } else if (params.get('key')) {
+      currentPage = 'verify-email';
     }
 
     checkAuth();
 
-    // Listen for auth changes (login/logout)
     window.addEventListener('auth-changed', handleAuthChanged);
     return () => window.removeEventListener('auth-changed', handleAuthChanged);
   });
@@ -64,6 +70,8 @@
   <PasswordResetRequest onNavigate={navigateTo} />
 {:else if currentPage === 'reset-confirm'}
   <PasswordResetConfirm onNavigate={navigateTo} />
+{:else if currentPage === 'verify-email'}
+  <VerifyEmail onNavigate={navigateTo} />
 {:else}
   <Login onNavigate={navigateTo} />
 {/if}
