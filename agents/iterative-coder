@@ -96,13 +96,14 @@ def get_tools(*, workdir, devbox, ui, model):
         cmd,
     ]
 
-
+#
 for i in range(1):
     SYSTEM_PROMPT = """You are  coding agent. Use the tools."""
     claudia_run(
         get_tools=get_tools,
         system_prompt=SYSTEM_PROMPT,
-        prompt="You are currently at the monumental task of rewriting the frontend into svelte and migrating to the changed API. Get a rough idea of where we currently are there, plan one small next step and then implement that small step. Do cleanups if it is necessary.")
+        # prompt="You are currently at the monumental task of rewriting the frontend into svelte and migrating to the changed API. Get a rough idea of where we currently are there, plan one next step and then implement that small step. Do cleanups if it is necessary.")
+        prompt="You are currently rewriting the frontend into svelte and migrating to the changed API. Implement one step towards this goal.")
 
 
 
