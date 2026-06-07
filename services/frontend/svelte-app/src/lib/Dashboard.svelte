@@ -46,21 +46,27 @@
   async function checkConnection() {
     connectionStatus = 'connecting';
     try {
-      // A lightweight endpoint to check API connectivity
-      const resp = await fetch('/api/core/hosts/', {
-        method: 'HEAD',
-        credentials: 'include',
-      });
-      connectionStatus = resp.ok ? 'connected' : 'disconnected';
+      await api.getHosts();
+      connectionStatus = 'connected';
     } catch {
       connectionStatus = 'disconnected';
     }
   }
 
-  onMount(async () => {
-    // Start connection check in background
-    checkConnection();
+  async function refreshHosts() {
+    try {
+      hosts = await api.getHosts();
+      if (hosts.length > 0 && !hosts.find(h => h.id === selectedHostId)) {
+        selectedHostId = hosts[0].id;
+        await loadQueryData();
+      }
+    } catch (e) {
+      console.error('Failed to refresh hosts', e);
+    }
+  }
 
+  onMount(async () => {
+    checkConnection();
     try {
       user = await api.getUser();
       hosts = await api.getHosts();
@@ -118,16 +124,11 @@
     loadQueryData();
   }
 
-  /** Sum all values in a category object */
   function categoryTotal(category) {
     if (!queryData || !queryData[category]) return 0;
     return Object.values(queryData[category]).reduce((a, b) => a + b, 0);
   }
 
-  /**
-   * Total visits = sum of daily visit counts in the 'date' category.
-   * This is the best approximation of total visits from the stored data.
-   */
   let totalVisits = $derived(categoryTotal('date'));
 
   function numberFormat(x) {
@@ -135,14 +136,12 @@
     return x.toString().replace(/\B(?=(?:\d{3})+(?!\d))/g, ',');
   }
 
-  /** Forward logout event to App.svelte via window custom event */
   function handleAuthChanged(event) {
     if (!event.detail.authenticated) {
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: false } }));
     }
   }
 
-  // Icon paths for each metric dimension
   const ICONS = {
     page: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
     loc: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -158,7 +157,6 @@
     chart: '<path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/>',
   };
 
-  // Normalization helpers for hour and weekday data
   const HOUR_LABELS = {
     0: '12 a.m.', 1: '1 a.m.', 2: '2 a.m.', 3: '3 a.m.',
     4: '4 a.m.', 5: '5 a.m.', 6: '6 a.m.', 7: '7 a.m.',
@@ -186,7 +184,6 @@
     );
   }
 </script>
-
 <div class="dashboard">
   <nav class="navbar">
     <div class="content">
@@ -283,7 +280,6 @@
           </div>
         </section>
 
-        <!-- Time-series chart for visits over time -->
         <section class="chart-section">
           <TimeSeriesChart
             dateData={queryData['date'] ?? {}}
@@ -292,37 +288,31 @@
           />
         </section>
 
-        <!-- Dimension panels: first row -->
         <section class="metrics-grid">
           <MetricsPanel title="Pages" icon={ICONS.page} data={queryData['page'] ?? {}} />
           <MetricsPanel title="Page Paths" icon={ICONS.loc} data={queryData['loc'] ?? {}} />
         </section>
 
-        <!-- Dimension panels: second row -->
         <section class="metrics-grid">
           <MetricsPanel title="Referrers" icon={ICONS.ref} data={queryData['ref'] ?? {}} />
           <MetricsPanel title="Countries" icon={ICONS.country} data={queryData['country'] ?? {}} />
         </section>
 
-        <!-- Dimension panels: third row -->
         <section class="metrics-grid">
           <MetricsPanel title="Browsers" icon={ICONS.browser} data={queryData['browser'] ?? {}} />
           <MetricsPanel title="Operating Systems" icon={ICONS.platform} data={queryData['platform'] ?? {}} />
         </section>
 
-        <!-- Dimension panels: fourth row -->
         <section class="metrics-grid">
           <MetricsPanel title="Devices" icon={ICONS.device} data={queryData['device'] ?? {}} />
           <MetricsPanel title="Languages" icon={ICONS.lang} data={queryData['lang'] ?? {}} />
         </section>
 
-        <!-- Dimension panels: fifth row -->
         <section class="metrics-grid">
           <MetricsPanel title="Screens" icon={ICONS.screen} data={queryData['screen'] ?? {}} />
           <MetricsPanel title="Hour" icon={ICONS.hour} data={getNormalizedHours(queryData['hour'])} />
         </section>
 
-        <!-- Dimension panels: sixth row -->
         <section class="metrics-grid">
           <MetricsPanel title="Day of Week" icon={ICONS.weekday} data={getNormalizedWeekdays(queryData['weekday'])} />
           <div></div>

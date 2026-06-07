@@ -28,6 +28,30 @@ function getCsrfToken() {
   return '';
 }
 
+function parseErrorData(errorData, status) {
+  if (!errorData || typeof errorData !== 'object') {
+    return 'Request failed (HTTP ' + status + ')';
+  }
+  if (typeof errorData.detail === 'string') {
+    return errorData.detail;
+  }
+  if (Array.isArray(errorData.non_field_errors) && errorData.non_field_errors.length > 0) {
+    return errorData.non_field_errors[0];
+  }
+  const messages = [];
+  for (const [field, errors] of Object.entries(errorData)) {
+    if (Array.isArray(errors)) {
+      messages.push(field + ': ' + errors.join(', '));
+    } else if (typeof errors === 'string') {
+      messages.push(field + ': ' + errors);
+    }
+  }
+  if (messages.length > 0) {
+    return messages.join('; ');
+  }
+  return 'Request failed (HTTP ' + status + ')';
+}
+
 async function request(method, path, body) {
   const headers = { 'Content-Type': 'application/json' };
 
@@ -57,11 +81,7 @@ async function request(method, path, body) {
     } catch {
       errorData = {};
     }
-    const msg = errorData.detail
-      || (errorData.non_field_errors && errorData.non_field_errors[0])
-      || (typeof errorData === 'string' ? errorData : null)
-      || errorData.name
-      || 'Request failed (HTTP ' + response.status + ')';
+    const msg = parseErrorData(errorData, response.status);
     const error = new Error(msg);
     error.status = response.status;
     error.data = errorData;
@@ -79,6 +99,18 @@ async function request(method, path, body) {
   } catch {
     return text;
   }
+}
+
+function buildUrl(path, params) {
+  if (!params) return path;
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null) {
+      qs.set(key, value);
+    }
+  }
+  const qsStr = qs.toString();
+  return qsStr ? path + '?' + qsStr : path;
 }
 
 const api = {
@@ -100,11 +132,9 @@ const api = {
   changePassword: (data) =>
     request('POST', '/auth/password/change/', data),
 
-  /** Request a password reset email */
   requestPasswordReset: (data) =>
     request('POST', '/auth/password/reset/', data),
 
-  /** Confirm a password reset with token */
   confirmPasswordReset: (data) =>
     request('POST', '/auth/password/reset/confirm/', data),
 
@@ -124,12 +154,11 @@ const api = {
     request('DELETE', '/core/hosts/' + id + '/'),
 
   query: (site, startDate, endDate) => {
-    const params = new URLSearchParams();
-    params.set('site', site);
-    if (startDate) params.set('start_date', startDate);
-    if (endDate) params.set('end_date', endDate);
-    const qs = params.toString();
-    return request('GET', '/core/query/' + (qs ? '?' + qs : ''));
+    return request('GET', buildUrl('/core/query/', {
+      site,
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+    }));
   },
 };
 

@@ -31,7 +31,10 @@
   let timezoneSaved = $state(false);
   let savingTimezone = $state(false);
 
-  // Timezone options
+  // Hide hosts preference state
+  let hideHostsPref = $state(false);
+  let hidingHostsSaving = $state(false);
+
   const TIMEZONES = [
     { offset: -12, label: '[UTC-12:00] United States Minor Outlying Islands' },
     { offset: -11, label: '[UTC-11:00] United States Minor Outlying Islands' },
@@ -65,6 +68,7 @@
   function openSettings(hostName) {
     hostForTracking = hostName;
     selectedTimezone = user?.timezone ?? 0;
+    hideHostsPref = user?.hide_hosts ?? false;
     resetPasswordState();
     timezoneSaved = false;
     showSettings = true;
@@ -191,7 +195,6 @@
     timezoneSaved = false;
     try {
       const updated = await api.updateUser({ timezone: selectedTimezone });
-      // Update the user object in place so the tracking code updates
       if (user) {
         user.timezone = updated.timezone ?? selectedTimezone;
       }
@@ -204,6 +207,22 @@
     }
   }
 
+  async function handleToggleHideHosts() {
+    const newValue = !hideHostsPref;
+    hidingHostsSaving = true;
+    try {
+      const updated = await api.updateUser({ hide_hosts: newValue });
+      if (user) {
+        user.hide_hosts = updated.hide_hosts ?? newValue;
+      }
+      hideHostsPref = user?.hide_hosts ?? newValue;
+    } catch (e) {
+      console.error('Failed to update hide_hosts preference', e);
+    } finally {
+      hidingHostsSaving = false;
+    }
+  }
+
   async function handleLogout() {
     try {
       await api.logout();
@@ -213,7 +232,6 @@
     }
   }
 </script>
-
 <button
   class="btn-icon"
   onclick={() => openSettings(selectedHostName)}
@@ -327,6 +345,28 @@
             {savingTimezone ? 'Saving...' : timezoneSaved ? 'Saved!' : 'Save'}
           </button>
         </div>
+      </div>
+
+      <div class="section">
+        <h3>Preferences</h3>
+        <p class="section-desc">Customize your dashboard experience.</p>
+        <label class="toggle-row">
+          <span class="toggle-label">
+            Hide inactive websites
+            <span class="toggle-hint">When enabled, hidden websites won't appear in the dashboard site selector.</span>
+          </span>
+          <button
+            class="toggle-switch"
+            class:active={hideHostsPref}
+            onclick={handleToggleHideHosts}
+            disabled={hidingHostsSaving}
+            aria-label="Toggle hide inactive websites"
+            role="switch"
+            aria-checked={hideHostsPref}
+          >
+            <span class="toggle-knob"></span>
+          </button>
+        </label>
       </div>
 
       <div class="section">
@@ -625,7 +665,6 @@
     border-color: #fca5a5;
   }
 
-  /* Timezone section */
   .timezone-form {
     display: flex;
     gap: 8px;
@@ -647,7 +686,63 @@
     box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
   }
 
-  /* Password form */
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+  }
+  .toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+  }
+  .toggle-hint {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: #d1d5db;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .toggle-switch.active {
+    background: #2563eb;
+  }
+  .toggle-switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .toggle-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-switch.active .toggle-knob {
+    transform: translateX(20px);
+  }
+
   .password-form {
     display: flex;
     flex-direction: column;
