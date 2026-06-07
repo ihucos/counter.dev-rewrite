@@ -33,10 +33,12 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
     timezone = serializers.IntegerField(default=0)
     prefs = serializers.JSONField(default=dict)
     hide_hosts = serializers.BooleanField(default=False)
+    uuid = serializers.UUIDField(source='uuid', read_only=True)
 
     class Meta(UserDetailsSerializer.Meta):
         model = User
         fields = UserDetailsSerializer.Meta.fields + (
+            "uuid",
             "timezone",
             "prefs",
             "hide_hosts",

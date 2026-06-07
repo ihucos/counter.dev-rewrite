@@ -2,10 +2,14 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api.js';
   import Login from '$lib/Login.svelte';
+  import Register from '$lib/Register.svelte';
   import Dashboard from '$lib/Dashboard.svelte';
+  import PasswordResetRequest from '$lib/PasswordResetRequest.svelte';
+  import PasswordResetConfirm from '$lib/PasswordResetConfirm.svelte';
 
   let isAuthenticated = $state(false);
   let checkingAuth = $state(true);
+  let currentPage = $state('login'); // 'login' | 'register' | 'reset-request' | 'reset-confirm'
 
   async function checkAuth() {
     try {
@@ -18,19 +22,30 @@
     }
   }
 
+  function navigateTo(page) {
+    currentPage = page;
+  }
+
+  function handleAuthChanged(e) {
+    isAuthenticated = e.detail.authenticated;
+    if (e.detail.authenticated) {
+      // Re-check auth state to ensure fresh CSRF tokens
+      checkAuth();
+    }
+  }
+
   onMount(() => {
+    // If URL has uid and token params, show reset confirm page
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('uid') && params.get('token')) {
+      currentPage = 'reset-confirm';
+    }
+
     checkAuth();
 
     // Listen for auth changes (login/logout)
-    const handler = (e) => {
-      isAuthenticated = e.detail.authenticated;
-      if (e.detail.authenticated) {
-        // Re-check auth state to ensure fresh CSRF tokens
-        checkAuth();
-      }
-    };
-    window.addEventListener('auth-changed', handler);
-    return () => window.removeEventListener('auth-changed', handler);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('auth-changed', handleAuthChanged);
   });
 </script>
 
@@ -40,8 +55,14 @@
   </div>
 {:else if isAuthenticated}
   <Dashboard />
+{:else if currentPage === 'register'}
+  <Register onNavigate={navigateTo} />
+{:else if currentPage === 'reset-request'}
+  <PasswordResetRequest onNavigate={navigateTo} />
+{:else if currentPage === 'reset-confirm'}
+  <PasswordResetConfirm onNavigate={navigateTo} />
 {:else}
-  <Login />
+  <Login onNavigate={navigateTo} />
 {/if}
 
 <style>

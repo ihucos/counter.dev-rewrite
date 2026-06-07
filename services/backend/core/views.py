@@ -20,9 +20,11 @@ from .serializers import (
 
 
 class HostViewSet(
+    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin,  # allows PATCH
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     serializer_class = HostSerializer
@@ -33,6 +35,9 @@ class HostViewSet(
         if self.request.user.hide_hosts:
             qs = qs.filter(hide=False)
         return qs.order_by("name")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         # PUT is not allowed (full replace) - only PATCH for partial updates

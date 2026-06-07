@@ -4,31 +4,56 @@
   let { onNavigate } = $props();
 
   let username = $state('');
-  let password = $state('');
+  let email = $state('');
+  let password1 = $state('');
+  let password2 = $state('');
   let error = $state('');
   let loading = $state(false);
+  let success = $state(false);
 
-  async function handleLogin() {
+  function getUTCOffset() {
+    return Math.round((-1 * new Date().getTimezoneOffset()) / 60);
+  }
+
+  async function handleRegister() {
     error = '';
     loading = true;
     try {
-      await api.login(username, password);
-      // Dispatch custom event so App.svelte can react
+      await api.register({
+        username,
+        email,
+        password1,
+        password2,
+        timezone: getUTCOffset(),
+      });
+      // Registration success - dispatch auth event so App.svelte transitions
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: true } }));
     } catch (e) {
-      error = e.message || 'Login failed';
+      error = e.message || 'Registration failed';
+      if (e.data && typeof e.data === 'object') {
+        // Join all field errors into a single message
+        const msgs = [];
+        for (const [field, errors] of Object.entries(e.data)) {
+          if (Array.isArray(errors)) {
+            msgs.push(`${field}: ${errors.join(', ')}`);
+          }
+        }
+        if (msgs.length > 0) {
+          error = msgs.join('; ');
+        }
+      }
     } finally {
       loading = false;
     }
   }
 </script>
 
-<div class="login-page">
-  <div class="login-card">
+<div class="register-page">
+  <div class="register-card">
     <div class="logotype"></div>
-    <h1>Sign in to Counter</h1>
+    <h1>Sign up to Counter</h1>
 
-    <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+    <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }}>
       {#if error}
         <div class="error-message">{error}</div>
       {/if}
@@ -38,8 +63,18 @@
         <input
           type="text"
           bind:value={username}
-          placeholder="Your username"
+          placeholder="Choose a username"
           required
+          disabled={loading}
+        />
+      </label>
+
+      <label>
+        Email
+        <input
+          type="email"
+          bind:value={email}
+          placeholder="Your email (optional)"
           disabled={loading}
         />
       </label>
@@ -48,38 +83,45 @@
         Password
         <input
           type="password"
-          bind:value={password}
-          placeholder="Your password"
+          bind:value={password1}
+          placeholder="Choose a password"
+          required
+          disabled={loading}
+        />
+      </label>
+
+      <label>
+        Confirm Password
+        <input
+          type="password"
+          bind:value={password2}
+          placeholder="Repeat password"
           required
           disabled={loading}
         />
       </label>
 
       <button type="submit" class="btn-primary full" disabled={loading}>
-        {loading ? 'Signing in...' : 'Sign in'}
+        {loading ? 'Creating account...' : 'Create account'}
       </button>
-
-      <div class="forgot-password">
-        <button class="link-btn" onclick={() => onNavigate('reset-request')}>Forgot password?</button>
-      </div>
     </form>
 
-    <p class="signup-link">
-      Don't have an account?
-      <button class="link-btn" onclick={() => onNavigate('register')}>Sign up</button>
+    <p class="login-link">
+      Already have an account?
+      <button class="link-btn" onclick={() => onNavigate('login')}>Sign in</button>
     </p>
   </div>
 </div>
 
 <style>
-  .login-page {
+  .register-page {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     background: #f5f5f5;
   }
-  .login-card {
+  .register-card {
     background: white;
     border-radius: 8px;
     padding: 40px;
@@ -149,11 +191,7 @@
     margin-bottom: 16px;
     font-size: 14px;
   }
-  .forgot-password {
-    text-align: center;
-    margin-top: 12px;
-  }
-  .signup-link {
+  .login-link {
     margin-top: 24px;
     text-align: center;
     font-size: 14px;

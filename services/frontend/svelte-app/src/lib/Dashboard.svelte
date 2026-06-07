@@ -167,6 +167,42 @@
     });
   }
 
+  /**
+   * Fill in missing dates between start and end so the time-series chart
+   * has a contiguous range.
+   */
+  function fillDateRange(dates, start, end) {
+    const filled = {};
+    const s = start ? new Date(start) : new Date(Object.keys(dates).sort()[0]);
+    const e = end ? new Date(end) : new Date();
+    const cur = new Date(s);
+    while (cur <= e) {
+      const key = cur.toISOString().slice(0, 10);
+      filled[key] = dates[key] || 0;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return filled;
+  }
+
+  function getDateEntries() {
+    if (!queryData || !queryData['date']) return [];
+    const filled = fillDateRange(queryData['date'], startDate, endDate);
+    return Object.entries(filled).sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  /** Format a YYYY-MM-DD date to a short label (e.g. "Jan 5") */
+  function shortDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  /** Compute max value for chart scaling */
+  function getDateMax() {
+    const entries = getDateEntries();
+    if (entries.length === 0) return 0;
+    return Math.max(...entries.map(([, v]) => v), 1);
+  }
+
   // Icon paths helper
   const ICONS = {
     page: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
@@ -179,6 +215,7 @@
     screen: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
     hour: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
     weekday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+    chart: '<path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/>',
   };
 </script>
 
@@ -266,6 +303,28 @@
             <div class="card-value">{numberFormat(categoryTotal('country'))}</div>
           </div>
         </section>
+
+        <!-- Time-series chart for visits over time -->
+        {#if hasData('date')}
+        <section class="chart-section">
+          <div class="chart-panel">
+            <div class="metrics-headline">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.chart}</svg>
+              <h3>Visits over Time</h3>
+            </div>
+            <div class="chart-container">
+              {#each getDateEntries() as [dateStr, count]}
+                {@const maxVal = getDateMax()}
+                {@const barHeight = maxVal > 0 ? Math.max((count / maxVal) * 120, 2) : 2}
+                <div class="chart-bar-wrapper" title="{dateStr}: {numberFormat(count)} visits">
+                  <div class="chart-bar" style="height: {barHeight}px;"></div>
+                  <span class="chart-label">{shortDate(dateStr)}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        </section>
+        {/if}
 
         <section class="metrics-grid">
           {#if hasData('page')}
@@ -526,6 +585,15 @@
   .card-label { font-size: 13px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .card-value { font-size: 28px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; color: #111; }
 
+  /* Time-series chart styles */
+  .chart-section { margin-top: 24px; }
+  .chart-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .chart-container { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding-top: 10px; overflow-x: auto; }
+  .chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1 0 auto; min-width: 28px; }
+  .chart-bar { width: 100%; max-width: 32px; background: linear-gradient(180deg, #2563eb 0%, #60a5fa 100%); border-radius: 3px 3px 0 0; transition: height 0.3s ease; min-height: 2px; }
+  .chart-bar-wrapper:hover .chart-bar { background: linear-gradient(180deg, #1d4ed8 0%, #3b82f6 100%); }
+  .chart-label { font-size: 9px; color: #999; margin-top: 4px; white-space: nowrap; transform: rotate(-30deg); transform-origin: left center; }
+
   .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px; }
 
   .metrics-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
@@ -546,5 +614,6 @@
   @media (max-width: 768px) {
     .metrics-grid { grid-template-columns: 1fr; }
     .toolbar-inner { flex-direction: column; }
+    .chart-label { font-size: 8px; }
   }
 </style>
