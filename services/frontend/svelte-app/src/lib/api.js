@@ -21,25 +21,49 @@ async function request(method, path, body) {
   }
 
   const options = { method, headers, credentials: 'include' };
-  if (body) {
+  if (body != null) {
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(API_BASE + path, options);
+  let response;
+  try {
+    response = await fetch(API_BASE + path, options);
+  } catch (fetchError) {
+    const error = new Error('Network error: unable to reach the server');
+    error.status = 0;
+    error.data = {};
+    throw error;
+  }
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = {};
+    }
     const msg = errorData.detail
       || (errorData.non_field_errors && errorData.non_field_errors[0])
-      || 'HTTP ' + response.status;
+      || (typeof errorData === 'string' ? errorData : null)
+      || 'Request failed (HTTP ' + response.status + ')';
     const error = new Error(msg);
     error.status = response.status;
     error.data = errorData;
     throw error;
   }
 
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return null;
+  }
+
   const text = await response.text();
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 const api = {

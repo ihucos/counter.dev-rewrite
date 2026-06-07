@@ -1,9 +1,15 @@
 <script>
   import { api } from '$lib/api.js';
   import { onMount } from 'svelte';
+  import Settings from '$lib/Settings.svelte';
 
   let hosts = $state([]);
-  let selectedHost = $state(null);
+  let selectedHostId = $state(null);
+  let selectedHostName = $derived.by(() => {
+    if (!selectedHostId) return null;
+    const h = hosts.find(h => h.id === selectedHostId);
+    return h ? h.name : null;
+  });
   let queryData = $state(null);
   let loading = $state(true);
   let queryLoading = $state(false);
@@ -37,7 +43,7 @@
       user = await api.getUser();
       hosts = await api.getHosts();
       if (hosts.length > 0) {
-        selectedHost = hosts[0].name;
+        selectedHostId = hosts[0].id;
         await loadQueryData();
       }
     } catch (e) {
@@ -48,12 +54,12 @@
   });
 
   async function loadQueryData() {
-    if (!selectedHost) return;
+    if (!selectedHostName) return;
     queryLoading = true;
     queryData = null;
     try {
       queryData = await api.query(
-        selectedHost,
+        selectedHostName,
         startDate || undefined,
         endDate || undefined
       );
@@ -83,8 +89,8 @@
     loadQueryData();
   }
 
-  function selectHost(name) {
-    selectedHost = name;
+  function selectHost(id) {
+    selectedHostId = id;
     loadQueryData();
   }
 
@@ -103,7 +109,7 @@
     if (!queryData || !queryData[category]) return [];
     return Object.entries(queryData[category])
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 12);
+      .slice(0, 15);
   }
 
   function hasData(dim) {
@@ -124,12 +130,10 @@
     return pct + '%';
   }
 
-  async function handleLogout() {
-    try {
-      await api.logout();
+  /** Forward logout event to App.svelte via window custom event */
+  function handleAuthChanged(event) {
+    if (!event.detail.authenticated) {
       window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: false } }));
-    } catch (e) {
-      console.error('Logout failed', e);
     }
   }
 
@@ -162,6 +166,20 @@
       return [label, weekdayData[key] || 0];
     });
   }
+
+  // Icon paths helper
+  const ICONS = {
+    page: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    ref: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17V11"/>',
+    country: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    browser: '<circle cx="12" cy="12" r="3"/><path d="M12 21a9 9 0 0 0 9-9"/><path d="M12 3a9 9 0 0 0-9 9"/><circle cx="12" cy="12" r="9"/>',
+    platform: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22h6"/><path d="M12 17v2"/>',
+    device: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 22h8"/>',
+    lang: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+    screen: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+    hour: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    weekday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  };
 </script>
 
 <div class="dashboard">
@@ -172,7 +190,12 @@
         {#if user}
           <span class="user-name">{user.username}</span>
         {/if}
-        <button onclick={handleLogout} class="btn-logout">Sign out</button>
+        <Settings
+          {hosts}
+          {selectedHostName}
+          {user}
+          onauthChanged={handleAuthChanged}
+        />
       </div>
     </div>
   </nav>
@@ -200,8 +223,8 @@
           {#each hosts as host (host.id)}
             <button
               class="chip"
-              class:active={selectedHost === host.name}
-              onclick={() => selectHost(host.name)}
+              class:active={selectedHostId === host.id}
+              onclick={() => selectHost(host.id)}
             >
               {host.name}
             </button>
@@ -231,6 +254,10 @@
             <div class="card-value">{numberFormat(categoryTotal('page'))}</div>
           </div>
           <div class="card">
+            <div class="card-label">Visitors</div>
+            <div class="card-value">{numberFormat(categoryTotal('visitor'))}</div>
+          </div>
+          <div class="card">
             <div class="card-label">Referrers</div>
             <div class="card-value">{numberFormat(categoryTotal('ref'))}</div>
           </div>
@@ -238,21 +265,13 @@
             <div class="card-label">Countries</div>
             <div class="card-value">{numberFormat(categoryTotal('country'))}</div>
           </div>
-          <div class="card">
-            <div class="card-label">Browsers</div>
-            <div class="card-value">{numberFormat(categoryTotal('browser'))}</div>
-          </div>
         </section>
 
         <section class="metrics-grid">
           {#if hasData('page')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 9H21" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M9 21V9" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.page}</svg>
               <h3>Pages</h3>
             </div>
             <div class="metrics-list">
@@ -273,12 +292,7 @@
           {#if hasData('ref')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 3V21H21" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M18 17V9" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M13 17V5" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M8 17V11" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.ref}</svg>
               <h3>Referrers</h3>
             </div>
             <div class="metrics-list">
@@ -301,11 +315,7 @@
           {#if hasData('country')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M2 12H22" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 2C15 2 18 5.5 18 12C18 18.5 15 22 12 22C9 22 6 18.5 6 12C6 5.5 9 2 12 2Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.country}</svg>
               <h3>Countries</h3>
             </div>
             <div class="metrics-list">
@@ -326,11 +336,7 @@
           {#if hasData('browser')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="3" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.browser}</svg>
               <h3>Browsers</h3>
             </div>
             <div class="metrics-list">
@@ -353,11 +359,7 @@
           {#if hasData('platform')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="4" y="2" width="16" height="20" rx="2" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M9 22H15" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 17V19" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.platform}</svg>
               <h3>Operating Systems</h3>
             </div>
             <div class="metrics-list">
@@ -378,11 +380,7 @@
           {#if hasData('device')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4H20V16H4V4Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M8 20H16" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 16V20" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.device}</svg>
               <h3>Devices</h3>
             </div>
             <div class="metrics-list">
@@ -405,9 +403,7 @@
           {#if hasData('lang')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 11.5C21.0034 12.8199 20.6951 14.1219 20.1 15.3C19.3944 16.7118 18.3098 17.8992 16.9674 18.7293C15.6251 19.5594 14.0782 19.9994 12.5 20C11.1801 20.0035 9.87812 19.6951 8.7 19.1L3 21L4.9 15.3C4.30493 14.1219 3.99656 12.8199 4 11.5C4.00061 9.92179 4.44061 8.37488 5.27072 7.03258C6.10083 5.69028 7.28825 4.6056 8.7 3.90003C9.87812 3.30496 11.1801 2.99659 12.5 3.00003H13C15.0843 3.11502 17.053 3.99479 18.5291 5.47089C20.0052 6.94699 20.885 8.91568 21 11V11.5Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.lang}</svg>
               <h3>Languages</h3>
             </div>
             <div class="metrics-list">
@@ -428,9 +424,7 @@
           {#if hasData('screen')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 3H5C4.46957 3 3.96086 3.21071 3.58579 3.58579C3.21071 3.96086 3 4.46957 3 5V8M21 8V5C21 4.46957 20.7893 3.96086 20.4142 3.58579C20.0391 3.21071 19.5304 3 19 3H16M16 21H19C19.5304 21 20.0391 20.7893 20.4142 20.4142C20.7893 20.0391 21 19.5304 21 19V16M3 16V19C3 19.5304 3.21071 20.0391 3.58579 20.4142C3.96086 20.7893 4.46957 21 5 21H8" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.screen}</svg>
               <h3>Screens</h3>
             </div>
             <div class="metrics-list">
@@ -453,10 +447,7 @@
           {#if hasData('hour')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 6V12L16 14" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.hour}</svg>
               <h3>Hour</h3>
             </div>
             <div class="metrics-list">
@@ -477,12 +468,7 @@
           {#if hasData('weekday')}
           <div class="metrics-panel">
             <div class="metrics-headline">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M16 2V6" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M8 2V6" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 10H21" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.weekday}</svg>
               <h3>Day of Week</h3>
             </div>
             <div class="metrics-list">
@@ -510,13 +496,11 @@
 
 <style>
   .dashboard { min-height: 100vh; background: #f5f5f5; }
-  .navbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; }
+  .navbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; position: sticky; top: 0; z-index: 100; }
   .navbar .content { display: flex; justify-content: space-between; align-items: center; }
   .logotype { width: 28px; height: 28px; background: #2563eb; border-radius: 6px; display: block; }
-  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-right { display: flex; align-items: center; gap: 8px; }
   .user-name { font-size: 14px; color: #666; }
-  .btn-logout { background: none; border: 1px solid #ddd; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
-  .btn-logout:hover { background: #f9fafb; }
 
   .content { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
   .loading-screen { display: flex; justify-content: center; align-items: center; min-height: 60vh; }
@@ -530,7 +514,7 @@
   .empty-state .small { font-size: 14px; color: #999; }
   .empty-data { text-align: center; padding: 60px 24px; color: #666; font-size: 16px; }
 
-  .toolbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; }
+  .toolbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; position: sticky; top: 53px; z-index: 99; }
   .toolbar-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .site-selector, .range-selector { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; transition: all 0.15s; }
@@ -542,7 +526,7 @@
   .card-label { font-size: 13px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .card-value { font-size: 28px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; color: #111; }
 
-  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px; }
 
   .metrics-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
@@ -561,5 +545,6 @@
 
   @media (max-width: 768px) {
     .metrics-grid { grid-template-columns: 1fr; }
+    .toolbar-inner { flex-direction: column; }
   }
 </style>

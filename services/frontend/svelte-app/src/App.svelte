@@ -7,8 +7,7 @@
   let isAuthenticated = $state(false);
   let checkingAuth = $state(true);
 
-  onMount(async () => {
-    // Check if user is already authenticated
+  async function checkAuth() {
     try {
       await api.getUser();
       isAuthenticated = true;
@@ -17,11 +16,21 @@
     } finally {
       checkingAuth = false;
     }
+  }
+
+  onMount(() => {
+    checkAuth();
 
     // Listen for auth changes (login/logout)
-    window.addEventListener('auth-changed', (e) => {
+    const handler = (e) => {
       isAuthenticated = e.detail.authenticated;
-    });
+      if (e.detail.authenticated) {
+        // Re-check auth state to ensure fresh CSRF tokens
+        checkAuth();
+      }
+    };
+    window.addEventListener('auth-changed', handler);
+    return () => window.removeEventListener('auth-changed', handler);
   });
 </script>
 
