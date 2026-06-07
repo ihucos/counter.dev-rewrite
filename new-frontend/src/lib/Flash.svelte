@@ -1,19 +1,35 @@
-<script>
-  let messages = $state([]);
+<script lang="ts">
+  interface FlashMessage {
+    id: number;
+    msg: string;
+    type: string;
+  }
+
+  interface FlashEventDetail {
+    message?: string;
+    type?: string;
+  }
+
+  interface FlashEvent extends CustomEvent {
+    detail: FlashEventDetail;
+  }
+
+  let messages = $state<FlashMessage[]>([]);
   let nextId = 0;
 
-  function add(msg, type = 'info') {
+  function add(msg: string, type: string = 'info'): void {
     const id = ++nextId;
     messages = [...messages, { id, msg, type }];
     setTimeout(() => { messages = messages.filter(m => m.id !== id); }, 4000);
   }
 
-  function remove(id) {
+  function remove(id: number): void {
     messages = messages.filter(m => m.id !== id);
   }
 
-  function handler(e) {
-    const { message, type } = e.detail || {};
+  function handler(e: Event): void {
+    const event = e as FlashEvent;
+    const { message, type } = event.detail || {};
     if (message) add(message, type || 'info');
   }
 
