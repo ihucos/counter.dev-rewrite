@@ -84,10 +84,9 @@ def get_api_documentation() -> dict:
 
 
 
-breakpoint()
 
 def get_tools(*, workdir, devbox, ui, model):
-    os.chdir(workdir)
+    # os.chdir(workdir)
     coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
 
     def cmd(bash_cmd: str):
@@ -97,8 +96,8 @@ def get_tools(*, workdir, devbox, ui, model):
 
 
     return [
-        # svelte_mcp_tool,
-        # coder,
+        svelte_mcp_tool,
+        coder,
         get_api_documentation,
         cmd
     ]

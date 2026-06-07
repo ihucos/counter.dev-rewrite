@@ -77,6 +77,8 @@ def get_tools(*, workdir, devbox, ui, model):
     os.chdir(workdir)
     coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
 
+    devbox.run(["sh", "-c", 'echo adsf > dd'])
+
 
     def cmd(bash_cmd: str):
         with die(), ui.loading(bash_cmd):
@@ -86,6 +88,8 @@ def get_tools(*, workdir, devbox, ui, model):
                 "stdout": compl.stdout,
                 "stderr": compl.stderr,
             }
+    # assert 0, cmd('pwd')
+    assert 0, devbox.run(["sh", "-c", 'echo axxxdsf > dd'])
 
     return [
         # svelte_mcp_tool,
