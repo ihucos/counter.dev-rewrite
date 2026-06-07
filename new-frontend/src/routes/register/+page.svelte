@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
 
@@ -10,15 +10,15 @@
   let loading = $state(false);
   let done = $state(false);
 
-  function flash(msg, type = 'info') {
+  function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
   }
 
-  function utcOffset() {
+  function utcOffset(): number {
     return Math.round((-1 * new Date().getTimezoneOffset()) / 60);
   }
 
-  async function handleRegister() {
+  async function handleRegister(): Promise<void> {
     error = '';
     if (!username.trim() || !password1 || !password2) {
       error = 'Please fill in required fields.';
@@ -40,7 +40,7 @@
       done = true;
       flash('Account created! Check your email for verification.', 'success');
     } catch (e) {
-      error = e.message || 'Registration failed.';
+      error = (e as Error).message || 'Registration failed.';
     } finally {
       loading = false;
     }
@@ -63,7 +63,7 @@
       </div>
       <a href="/" class="btn-primary" style="display:block;text-align:center;">Go to Sign In</a>
     {:else}
-      <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }}>
+      <form onsubmit={(e: Event) => { e.preventDefault(); handleRegister(); }}>
         {#if error}<div class="error">{error}</div>{/if}
 
         <label>

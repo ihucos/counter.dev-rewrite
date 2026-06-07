@@ -1,11 +1,14 @@
-<script>
+<script lang="ts">
   /**
    * MetricsPanel - displays a bar chart panel for metrics data.
    * Props:
    *   title: string
    *   data: Record<string, number>
    */
-  let { title = '', data = {} } = $props();
+  let {
+    title = '',
+    data = {} as Record<string, number>
+  }: { title: string; data: Record<string, number> } = $props();
 
   let entries = $derived(
     Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 15)
@@ -13,18 +16,18 @@
 
   let total = $derived(Object.values(data).reduce((a, b) => a + b, 0));
 
-  function n(x) {
+  function n(x: number | null | undefined): string {
     if (x == null) return '0';
     return x.toString().replace(/\B(?=(?:\d{3})+(?!\d))/g, ',');
   }
 
-  function pct(value) {
+  function pct(value: number): number {
     if (!total) return 0;
     const p = Math.round((value / total) * 100);
     return p === 0 && value > 0 ? 1 : p;
   }
 
-  function hasData() {
+  function hasData(): boolean {
     return Object.keys(data).length > 0;
   }
 </script>

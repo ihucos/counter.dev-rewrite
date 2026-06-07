@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { api } from '$lib/api.js';
 
   let email = $state('');
@@ -6,7 +6,7 @@
   let loading = $state(false);
   let done = $state(false);
 
-  async function handleReset() {
+  async function handleReset(): Promise<void> {
     error = '';
     if (!email.trim()) { error = 'Please enter your email.'; return; }
     loading = true;
@@ -14,7 +14,7 @@
       await api.requestPasswordReset(email);
       done = true;
     } catch (e) {
-      error = e.message || 'Request failed.';
+      error = (e as Error).message || 'Request failed.';
     } finally {
       loading = false;
     }
@@ -33,7 +33,7 @@
       <a href="/" class="btn-primary" style="display:block;text-align:center;">Back to Sign In</a>
     {:else}
       <p class="desc">Enter your email and we'll send you a reset link.</p>
-      <form onsubmit={(e) => { e.preventDefault(); handleReset(); }}>
+      <form onsubmit={(e: Event) => { e.preventDefault(); handleReset(); }}>
         {#if error}<div class="error">{error}</div>{/if}
         <label>
           Email

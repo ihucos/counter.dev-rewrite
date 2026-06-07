@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
 
@@ -8,11 +8,11 @@
   let loading = $state(false);
   let showPassword = $state(false);
 
-  function flash(msg, type = 'info') {
+  function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
   }
 
-  async function handleLogin() {
+  async function handleLogin(): Promise<void> {
     error = '';
     if (!username.trim() || !password) {
       error = 'Please fill in all fields.';
@@ -24,7 +24,7 @@
       flash('Welcome back!', 'success');
       goto('/dashboard');
     } catch (e) {
-      error = e.message || 'Login failed.';
+      error = (e as Error).message || 'Login failed.';
     } finally {
       loading = false;
     }
@@ -45,7 +45,7 @@
     <div class="logo"></div>
     <h1>Sign In</h1>
 
-    <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+    <form onsubmit={(e: Event) => { e.preventDefault(); handleLogin(); }}>
       {#if error}
         <div class="error">{error}</div>
       {/if}

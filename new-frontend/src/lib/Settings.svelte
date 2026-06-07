@@ -1,10 +1,14 @@
-<script>
+<script lang="ts">
   /**
    * Settings modal - manage hosts/sites, view tracking info, change password.
    */
   import { api } from './api.js';
+  import type { UserData, HostData } from './api.js';
 
-  let { user = null, hosts = [] } = $props();
+  let {
+    user = null,
+    hosts = [] as HostData[]
+  }: { user: UserData | null; hosts: HostData[] } = $props();
 
   let open = $state(false);
   let newSiteName = $state('');
@@ -20,11 +24,11 @@
   let pwdSuccess = $state('');
   let changingPwd = $state(false);
 
-  function flash(msg, type = 'info') {
+  function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
   }
 
-  async function copyTrackingCode() {
+  async function copyTrackingCode(): Promise<void> {
     const uuid = user?.uuid || 'YOUR_UUID';
     const code = `<script src="https://cdn.counter.dev/script.js" data-id="${uuid}" data-utcoffset="${user?.timezone ?? 0}"><\/script>`;
     try {
@@ -45,45 +49,45 @@
     }
   }
 
-  async function addSite() {
+  async function addSite(): Promise<void> {
     const name = newSiteName.trim();
     if (!name) return;
     addError = '';
     adding = true;
     try {
       const host = await api.createHost({ name });
-      hosts.push(host);
+      if (host) hosts.push(host);
       newSiteName = '';
       flash(`Added "${name}"`, 'success');
     } catch (e) {
-      addError = e.message || 'Failed to add.';
+      addError = (e as Error).message || 'Failed to add.';
     } finally {
       adding = false;
     }
   }
 
-  async function deleteHost(host) {
+  async function deleteHost(host: HostData): Promise<void> {
     if (!confirm(`Delete "${host.name}" permanently?`)) return;
     try {
       await api.deleteHost(host.id);
       const idx = hosts.indexOf(host);
       if (idx !== -1) hosts.splice(idx, 1);
       flash(`Deleted "${host.name}"`, 'success');
-    } catch (e) {
+    } catch {
       flash('Failed to delete.', 'error');
     }
   }
 
-  async function toggleHide(host) {
+  async function toggleHide(host: HostData): Promise<void> {
     try {
       const updated = await api.updateHost(host.id, { hide: !host.hide });
-      host.hide = updated.hide;
-    } catch (e) {
+      if (updated) host.hide = updated.hide;
+    } catch {
       flash('Failed to update.', 'error');
     }
   }
 
-  async function changePassword() {
+  async function changePassword(): Promise<void> {
     pwdError = '';
     pwdSuccess = '';
     if (!oldPwd || !newPwd1 || newPwd1 !== newPwd2) {
@@ -101,7 +105,7 @@
       flash('Password changed!', 'success');
       oldPwd = ''; newPwd1 = ''; newPwd2 = '';
     } catch (e) {
-      pwdError = e.message || 'Failed.';
+      pwdError = (e as Error).message || 'Failed.';
     } finally {
       changingPwd = false;
     }
@@ -125,7 +129,7 @@
       <!-- Add site -->
       <section>
         <h3>Add Website</h3>
-        <form class="inline-form" onsubmit={(e) => { e.preventDefault(); addSite(); }}>
+        <form class="inline-form" onsubmit={(e: Event) => { e.preventDefault(); addSite(); }}>
           <input type="text" bind:value={newSiteName} placeholder="e.g. example.com" disabled={adding} />
           <button type="submit" class="btn" disabled={adding || !newSiteName.trim()}>
             {adding ? '...' : 'Add'}

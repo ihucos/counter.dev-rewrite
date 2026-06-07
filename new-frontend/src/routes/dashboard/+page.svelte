@@ -1,25 +1,24 @@
-<script>
+<script lang="ts">
   import { goto } from '$app/navigation';
   import { api } from '$lib/api.js';
-  import Settings from '$lib/Settings.svelte';
-  import MetricsPanel from '$lib/MetricsPanel.svelte';
+  import type { HostData } from '$lib/api.js';
 
-  let user = $state(null);
-  let hosts = $state([]);
-  let selectedHost = $state(null);
-  let queryData = $state(null);
+  let user = $state<any>(null);
+  let hosts = $state<HostData[]>([]);
+  let selectedHost = $state<HostData | null>(null);
+  let queryData = $state<any>(null);
   let loading = $state(true);
   let queryLoading = $state(false);
   let error = $state('');
   let range = $state('last7');
 
-  function today() { return new Date().toISOString().slice(0, 10); }
-  function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+  function today(): string { return new Date().toISOString().slice(0, 10); }
+  function daysAgo(n: number): string { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
   let startDate = $state(daysAgo(7));
   let endDate = $state(today());
 
-  const RANGES = [
+  const RANGES: { key: string; label: string; days: number | null; from?: number; to?: number }[] = [
     { key: 'today', label: 'Today', days: 0 },
     { key: 'yesterday', label: 'Yesterday', days: 1, from: 1, to: 1 },
     { key: 'last7', label: 'Last 7 days', days: 7 },
@@ -27,11 +26,11 @@
     { key: 'all', label: 'All time', days: null },
   ];
 
-  function flash(msg, type = 'info') {
+  function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
   }
 
-  function selectRange(r) {
+  function selectRange(r: typeof RANGES[number]): void {
     range = r.key;
     if (r.days === null) { startDate = ''; endDate = ''; }
     else if (r.days === 0) { startDate = today(); endDate = today(); }
@@ -40,35 +39,35 @@
     loadData();
   }
 
-  async function loadData() {
+  async function loadData(): Promise<void> {
     if (!selectedHost) return;
     queryLoading = true;
     try {
       queryData = await api.query(selectedHost.name, startDate || undefined, endDate || undefined);
     } catch (e) {
       queryData = null;
-      flash('Failed to load data: ' + e.message, 'error');
+      flash('Failed to load data: ' + (e as Error).message, 'error');
     } finally {
       queryLoading = false;
     }
   }
 
-  function selectHost(host) {
+  function selectHost(host: HostData): void {
     selectedHost = host;
     loadData();
   }
 
-  function n(v) {
+  function n(v: number | null | undefined): string {
     if (v == null) return '0';
     return v.toString().replace(/\B(?=(?:\d{3})+(?!\d))/g, ',');
   }
 
-  function catTotal(cat) {
+  function catTotal(cat: string): number {
     if (!queryData || !queryData[cat]) return 0;
-    return Object.values(queryData[cat]).reduce((a, b) => a + b, 0);
+    return Object.values(queryData[cat]).reduce((a: number, b: number) => a + b, 0);
   }
 
-  async function logout() {
+  async function logout(): Promise<void> {
     try {
       await api.logout();
     } catch {
@@ -81,7 +80,8 @@
   $effect(() => {
     api.getUser().then(async (u) => {
       user = u;
-      hosts = await api.getHosts();
+      const h = await api.getHosts();
+      hosts = h ?? [];
       if (hosts.length > 0) {
         selectedHost = hosts[0];
         queryData = await api.query(selectedHost.name, startDate || undefined, endDate || undefined);

@@ -22,12 +22,12 @@
  *   GET    /api/core/query/
  */
 
-interface ApiError extends Error {
+export interface ApiError extends Error {
   status: number;
   data?: Record<string, unknown>;
 }
 
-interface UserData {
+export interface UserData {
   pk: number;
   email: string;
   username: string;
@@ -37,7 +37,7 @@ interface UserData {
   prefs: Record<string, unknown>;
 }
 
-interface HostData {
+export interface HostData {
   id: number;
   name: string;
   host: string;
@@ -50,7 +50,7 @@ interface QueryResultItem {
   total: number;
 }
 
-interface QueryResult {
+export interface QueryResult {
   [category: string]: QueryResultItem[];
 }
 
@@ -66,9 +66,10 @@ interface LoginData {
 
 interface RegisterData {
   username: string;
-  email: string;
+  email?: string;
   password1: string;
   password2: string;
+  timezone?: number;
 }
 
 interface VerifyEmailData {
@@ -106,19 +107,13 @@ interface UpdateUserData {
 
 interface CreateHostData {
   name: string;
-  host: string;
+  host?: string;
 }
 
 interface UpdateHostData {
   name?: string;
   host?: string;
   hide?: boolean;
-}
-
-interface QueryParams {
-  site: string;
-  start_date?: string;
-  end_date?: string;
 }
 
 const API_BASE = '/api';
@@ -251,3 +246,6 @@ export const api = {
       end_date: endDate || undefined,
     } as Record<string, string | undefined>)),
 };
+
+// Also grab the host field from CreateHostData as optional in the interface
+export type { LoginData, RegisterData, CreateHostData, UpdateHostData, UpdateUserData, ChangePasswordData, RequestPasswordResetData, ConfirmPasswordResetData, QueryParams };
