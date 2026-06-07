@@ -1,0 +1,103 @@
+#!/usr/bin/env uv run --script
+# /// script
+# dependencies = [
+#     "llm",
+#     "llm-tools-mcp",
+#     "claudia-agent",
+#     "pyyaml",
+# ]
+# [tool.uv.sources]
+# claudia-agent = { path = "/Users/ihucos/claudia" }
+# ///
+
+
+import tempfile
+import yaml
+import subprocess
+import os
+from pathlib import Path
+
+from llm_tools_mcp.register_tools import MCP
+from claudia.backends.agent import run as claudia_run
+from claudia.backends.agent import CoderToolbox
+from claudia.backends.agent import die
+
+config = tempfile.NamedTemporaryFile()
+
+config.write(
+    b"""
+{
+	"mcpServers": {
+		"svelte": {
+			"command": "npx",
+			"args": ["-y", "@sveltejs/mcp"]
+		}
+	}
+}"""
+)
+config.flush()
+
+
+svelte_mcp_tool = MCP(config.name)
+
+
+def get_api_documentation() -> dict:
+    with die():
+        # Find parent path with .git folder
+        project_dir = None
+        current_dir = Path.cwd().resolve()
+        for path in [current_dir] + list(current_dir.parents):
+            git_dir = path / ".git"
+            if git_dir.is_dir():
+                project_dir = path
+                break
+        if not project_dir:
+            raise Exception("Could not find git directory")
+
+        doc_yaml = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "run",
+                "--no-deps",
+                "backend",
+                "python3",
+                "manage.py",
+                "spectacular",
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+            cwd=project_dir,
+        ).stdout
+        return yaml.safe_load(doc_yaml)
+
+
+def get_tools(*, workdir, devbox, ui, model):
+    os.chdir(workdir)
+    coder = CoderToolbox(ui=ui, workdir=workdir, model=model)
+
+    def cmd(bash_cmd: str):
+        with die(), ui.loading(bash_cmd):
+            compl = devbox.run(["sh", "-c", bash_cmd])
+            return {
+                "exit_code": compl.returncode,
+                "stdout": compl.stdout,
+                "stderr": compl.stderr,
+            }
+
+    return [
+        # svelte_mcp_tool,
+        # coder,
+        coder.read_files,
+        coder.write_file,
+        get_api_documentation,
+        cmd,
+    ]
+
+
+SYSTEM_PROMPT = """You are  coding agent. Use the tools."""
+claudia_run(
+    get_tools=get_tools,
+    system_prompt=SYSTEM_PROMPT,
+    prompt="You are currently at the monumental task of rewriting the frontend into svelte and migrating to the changed API. Get a rough idea of where we currently are there, plan one small next step and then implement that small step. Do cleanups if it is necessary.")

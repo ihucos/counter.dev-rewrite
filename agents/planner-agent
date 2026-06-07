@@ -2,7 +2,7 @@
 # /// script
 # dependencies = [
 #     "llm",
-#     "llm-tools-mcp",
+#     "llm-anthropic",
 #     "claudia-agent",
 #     "pyyaml",
 # ]
@@ -23,7 +23,7 @@ SYSTEM_PROMPT = """
 You are a planning agent.
 
 # Task
-Break up the given ticket into just a few still high-level subtickets.
+Break up the given ticket into just a few still high-level, short subtickets. A subticket consits of just a few short bullet points.
 
 # Project map
 {project_map}
@@ -31,10 +31,11 @@ Break up the given ticket into just a few still high-level subtickets.
 """.strip()
 
 
-def submit_tasks(tasks: list[str]) -> None:
-    for task in tasks:
-        print("====")
-        print(task)
+def add_ticket(title:str, content:str) -> None:
+    print(f"======== {title}")
+    print(content)
+    print()
+    print()
 
 def get_tools(*, workdir, devbox, ui, model):
 
@@ -46,8 +47,12 @@ def get_tools(*, workdir, devbox, ui, model):
         # svelte_mcp_tool,
         # coder,
         coder.read_files,
-        submit_tasks
+        add_ticket,
     ]
 
 
-claudia_run(get_tools=get_tools, system_prompt=SYSTEM_PROMPT)
+# import llm
+# model = llm.get_model("anthropic/claude-opus-4-8")
+
+
+claudia_run(get_tools=get_tools, system_prompt=SYSTEM_PROMPT) #, model=model)
