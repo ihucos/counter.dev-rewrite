@@ -1,3 +1,7 @@
+node_modules/
+.svelte-kit/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
