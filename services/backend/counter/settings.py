@@ -109,15 +109,22 @@ REST_FRAMEWORK = {
 }
 
 # API lives at app.counter.dev, accessed from counter.dev
+# In Docker Compose, the frontend nginx proxies /api to backend,
+# so the Origin will be http://localhost:3000 (the nginx proxy).
+# Also allow the Docker service name for internal health checks.
 CORS_ALLOWED_ORIGINS = os.environ.get(
     "CORS_ALLOWED_ORIGINS",
-    "https://counter.dev,http://localhost:3000",
+    "https://counter.dev,http://localhost:3000,http://localhost",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     "CSRF_TRUSTED_ORIGINS",
-    "https://counter.dev,https://app.counter.dev",
+    "https://counter.dev,https://app.counter.dev,http://localhost:3000",
 ).split(",")
+
+# When behind the nginx reverse proxy, trust the X-Forwarded-Proto header
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 EMAIL_BACKEND = os.environ.get(
     "DJANGO_EMAIL_BACKEND",

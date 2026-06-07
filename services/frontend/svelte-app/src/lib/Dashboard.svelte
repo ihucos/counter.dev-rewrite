@@ -2,6 +2,10 @@
   import { api } from '$lib/api.js';
   import { onMount } from 'svelte';
   import Settings from '$lib/Settings.svelte';
+  import MetricsPanel from '$lib/MetricsPanel.svelte';
+  import TimeSeriesChart from '$lib/TimeSeriesChart.svelte';
+  import DownloadCSV from '$lib/DownloadCSV.svelte';
+  import ConnectionStatus from '$lib/ConnectionStatus.svelte';
 
   let hosts = $state([]);
   let selectedHostId = $state(null);
@@ -15,6 +19,7 @@
   let queryLoading = $state(false);
   let error = $state('');
   let user = $state(null);
+  let connectionStatus = $state('checking');
 
   function today() {
     const d = new Date();
@@ -38,7 +43,24 @@
     { key: 'all', label: 'All time', days: null },
   ];
 
+  async function checkConnection() {
+    connectionStatus = 'connecting';
+    try {
+      // A lightweight endpoint to check API connectivity
+      const resp = await fetch('/api/core/hosts/', {
+        method: 'HEAD',
+        credentials: 'include',
+      });
+      connectionStatus = resp.ok ? 'connected' : 'disconnected';
+    } catch {
+      connectionStatus = 'disconnected';
+    }
+  }
+
   onMount(async () => {
+    // Start connection check in background
+    checkConnection();
+
     try {
       user = await api.getUser();
       hosts = await api.getHosts();
@@ -46,8 +68,10 @@
         selectedHostId = hosts[0].id;
         await loadQueryData();
       }
+      connectionStatus = 'connected';
     } catch (e) {
       error = e.message || 'Failed to load data';
+      connectionStatus = 'disconnected';
     } finally {
       loading = false;
     }
@@ -100,34 +124,15 @@
     return Object.values(queryData[category]).reduce((a, b) => a + b, 0);
   }
 
+  /**
+   * Total visits = sum of daily visit counts in the 'date' category.
+   * This is the best approximation of total visits from the stored data.
+   */
+  let totalVisits = $derived(categoryTotal('date'));
+
   function numberFormat(x) {
     if (x == null) return '0';
     return x.toString().replace(/\B(?=(?:\d{3})+(?!\d))/g, ',');
-  }
-
-  function getSortedEntries(category) {
-    if (!queryData || !queryData[category]) return [];
-    return Object.entries(queryData[category])
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 15);
-  }
-
-  function hasData(dim) {
-    return queryData && queryData[dim] && Object.keys(queryData[dim]).length > 0;
-  }
-
-  function percentRepr(value, total) {
-    if (!total) return 0;
-    const pct = Math.round((value / total) * 100);
-    if (pct === 0 && value > 0) return 0.5;
-    return pct;
-  }
-
-  function percentLabel(value, total) {
-    if (!total) return '0%';
-    const pct = Math.round((value / total) * 100);
-    if (pct === 0 && value > 0) return '<1%';
-    return pct + '%';
   }
 
   /** Forward logout event to App.svelte via window custom event */
@@ -137,75 +142,10 @@
     }
   }
 
-  // Time helpers
-  const HOUR_LABELS = {
-    0: '12 a.m.', 1: '1 a.m.', 2: '2 a.m.', 3: '3 a.m.',
-    4: '4 a.m.', 5: '5 a.m.', 6: '6 a.m.', 7: '7 a.m.',
-    8: '8 a.m.', 9: '9 a.m.', 10: '10 a.m.', 11: '11 a.m.',
-    12: '12 noon', 13: '1 p.m.', 14: '2 p.m.', 15: '3 p.m.',
-    16: '4 p.m.', 17: '5 p.m.', 18: '6 p.m.', 19: '7 p.m.',
-    20: '8 p.m.', 21: '9 p.m.', 22: '10 p.m.', 23: '11 p.m.',
-  };
-
-  function getNormalizedHours(hours) {
-    if (!hours) return [];
-    const pad = Object.fromEntries([...Array(24).keys()].map(i => [HOUR_LABELS[i], 0]));
-    const formatted = Object.fromEntries(
-      Object.entries(hours).map(([k, v]) => [HOUR_LABELS[k] || k, v])
-    );
-    const merged = { ...pad, ...formatted };
-    return Object.entries(merged);
-  }
-
-  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  function getNormalizedWeekdays(weekdayData) {
-    if (!weekdayData) return [];
-    return WEEKDAY_LABELS.map((label, idx) => {
-      const key = String(idx);
-      return [label, weekdayData[key] || 0];
-    });
-  }
-
-  /**
-   * Fill in missing dates between start and end so the time-series chart
-   * has a contiguous range.
-   */
-  function fillDateRange(dates, start, end) {
-    const filled = {};
-    const s = start ? new Date(start) : new Date(Object.keys(dates).sort()[0]);
-    const e = end ? new Date(end) : new Date();
-    const cur = new Date(s);
-    while (cur <= e) {
-      const key = cur.toISOString().slice(0, 10);
-      filled[key] = dates[key] || 0;
-      cur.setDate(cur.getDate() + 1);
-    }
-    return filled;
-  }
-
-  function getDateEntries() {
-    if (!queryData || !queryData['date']) return [];
-    const filled = fillDateRange(queryData['date'], startDate, endDate);
-    return Object.entries(filled).sort((a, b) => a[0].localeCompare(b[0]));
-  }
-
-  /** Format a YYYY-MM-DD date to a short label (e.g. "Jan 5") */
-  function shortDate(dateStr) {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  /** Compute max value for chart scaling */
-  function getDateMax() {
-    const entries = getDateEntries();
-    if (entries.length === 0) return 0;
-    return Math.max(...entries.map(([, v]) => v), 1);
-  }
-
-  // Icon paths helper
+  // Icon paths for each metric dimension
   const ICONS = {
     page: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    loc: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
     ref: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17V11"/>',
     country: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
     browser: '<circle cx="12" cy="12" r="3"/><path d="M12 21a9 9 0 0 0 9-9"/><path d="M12 3a9 9 0 0 0-9 9"/><circle cx="12" cy="12" r="9"/>',
@@ -217,6 +157,34 @@
     weekday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
     chart: '<path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/>',
   };
+
+  // Normalization helpers for hour and weekday data
+  const HOUR_LABELS = {
+    0: '12 a.m.', 1: '1 a.m.', 2: '2 a.m.', 3: '3 a.m.',
+    4: '4 a.m.', 5: '5 a.m.', 6: '6 a.m.', 7: '7 a.m.',
+    8: '8 a.m.', 9: '9 a.m.', 10: '10 a.m.', 11: '11 a.m.',
+    12: '12 noon', 13: '1 p.m.', 14: '2 p.m.', 15: '3 p.m.',
+    16: '4 p.m.', 17: '5 p.m.', 18: '6 p.m.', 19: '7 p.m.',
+    20: '8 p.m.', 21: '9 p.m.', 22: '10 p.m.', 23: '11 p.m.',
+  };
+
+  function getNormalizedHours(hours) {
+    if (!hours) return {};
+    const pad = Object.fromEntries([...Array(24).keys()].map(i => [HOUR_LABELS[i], 0]));
+    const formatted = Object.fromEntries(
+      Object.entries(hours).map(([k, v]) => [HOUR_LABELS[k] || k, v])
+    );
+    return { ...pad, ...formatted };
+  }
+
+  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function getNormalizedWeekdays(weekdayData) {
+    if (!weekdayData) return {};
+    return Object.fromEntries(
+      WEEKDAY_LABELS.map((label, idx) => [label, weekdayData[String(idx)] || 0])
+    );
+  }
 </script>
 
 <div class="dashboard">
@@ -227,6 +195,7 @@
         {#if user}
           <span class="user-name">{user.username}</span>
         {/if}
+        <ConnectionStatus status={connectionStatus} />
         <Settings
           {hosts}
           {selectedHostName}
@@ -256,27 +225,37 @@
   {:else}
     <section class="toolbar">
       <div class="content toolbar-inner">
-        <div class="site-selector">
-          {#each hosts as host (host.id)}
-            <button
-              class="chip"
-              class:active={selectedHostId === host.id}
-              onclick={() => selectHost(host.id)}
-            >
-              {host.name}
-            </button>
-          {/each}
+        <div class="toolbar-left">
+          <div class="site-selector">
+            {#each hosts as host (host.id)}
+              <button
+                class="chip"
+                class:active={selectedHostId === host.id}
+                onclick={() => selectHost(host.id)}
+              >
+                {host.name}
+              </button>
+            {/each}
+          </div>
         </div>
-        <div class="range-selector">
-          {#each RANGES as r}
-            <button
-              class="chip"
-              class:active={range === r.key}
-              onclick={() => selectRange(r)}
-            >
-              {r.label}
-            </button>
-          {/each}
+        <div class="toolbar-right">
+          <div class="range-selector">
+            {#each RANGES as r}
+              <button
+                class="chip"
+                class:active={range === r.key}
+                onclick={() => selectRange(r)}
+              >
+                {r.label}
+              </button>
+            {/each}
+          </div>
+          <DownloadCSV
+            data={queryData ?? {}}
+            hostName={selectedHostName ?? 'unknown'}
+            {startDate}
+            {endDate}
+          />
         </div>
       </div>
     </section>
@@ -291,8 +270,8 @@
             <div class="card-value">{numberFormat(categoryTotal('page'))}</div>
           </div>
           <div class="card">
-            <div class="card-label">Visitors</div>
-            <div class="card-value">{numberFormat(categoryTotal('visitor'))}</div>
+            <div class="card-label">Visits</div>
+            <div class="card-value">{numberFormat(totalVisits)}</div>
           </div>
           <div class="card">
             <div class="card-label">Referrers</div>
@@ -305,245 +284,48 @@
         </section>
 
         <!-- Time-series chart for visits over time -->
-        {#if hasData('date')}
         <section class="chart-section">
-          <div class="chart-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.chart}</svg>
-              <h3>Visits over Time</h3>
-            </div>
-            <div class="chart-container">
-              {#each getDateEntries() as [dateStr, count]}
-                {@const maxVal = getDateMax()}
-                {@const barHeight = maxVal > 0 ? Math.max((count / maxVal) * 120, 2) : 2}
-                <div class="chart-bar-wrapper" title="{dateStr}: {numberFormat(count)} visits">
-                  <div class="chart-bar" style="height: {barHeight}px;"></div>
-                  <span class="chart-label">{shortDate(dateStr)}</span>
-                </div>
-              {/each}
-            </div>
-          </div>
-        </section>
-        {/if}
-
-        <section class="metrics-grid">
-          {#if hasData('page')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.page}</svg>
-              <h3>Pages</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('page') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('page'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('page'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
-
-          {#if hasData('ref')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.ref}</svg>
-              <h3>Referrers</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('ref') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('ref'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('ref'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+          <TimeSeriesChart
+            dateData={queryData['date'] ?? {}}
+            {startDate}
+            {endDate}
+          />
         </section>
 
+        <!-- Dimension panels: first row -->
         <section class="metrics-grid">
-          {#if hasData('country')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.country}</svg>
-              <h3>Countries</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('country') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('country'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('country'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
-
-          {#if hasData('browser')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.browser}</svg>
-              <h3>Browsers</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('browser') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('browser'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('browser'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+          <MetricsPanel title="Pages" icon={ICONS.page} data={queryData['page'] ?? {}} />
+          <MetricsPanel title="Page Paths" icon={ICONS.loc} data={queryData['loc'] ?? {}} />
         </section>
 
+        <!-- Dimension panels: second row -->
         <section class="metrics-grid">
-          {#if hasData('platform')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.platform}</svg>
-              <h3>Operating Systems</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('platform') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('platform'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('platform'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
-
-          {#if hasData('device')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.device}</svg>
-              <h3>Devices</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('device') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('device'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('device'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+          <MetricsPanel title="Referrers" icon={ICONS.ref} data={queryData['ref'] ?? {}} />
+          <MetricsPanel title="Countries" icon={ICONS.country} data={queryData['country'] ?? {}} />
         </section>
 
+        <!-- Dimension panels: third row -->
         <section class="metrics-grid">
-          {#if hasData('lang')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.lang}</svg>
-              <h3>Languages</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('lang') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('lang'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('lang'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
-
-          {#if hasData('screen')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.screen}</svg>
-              <h3>Screens</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getSortedEntries('screen') as [item, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('screen'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{item}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('screen'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+          <MetricsPanel title="Browsers" icon={ICONS.browser} data={queryData['browser'] ?? {}} />
+          <MetricsPanel title="Operating Systems" icon={ICONS.platform} data={queryData['platform'] ?? {}} />
         </section>
 
+        <!-- Dimension panels: fourth row -->
         <section class="metrics-grid">
-          {#if hasData('hour')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.hour}</svg>
-              <h3>Hour</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getNormalizedHours(queryData.hour) as [label, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('hour'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{label}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('hour'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+          <MetricsPanel title="Devices" icon={ICONS.device} data={queryData['device'] ?? {}} />
+          <MetricsPanel title="Languages" icon={ICONS.lang} data={queryData['lang'] ?? {}} />
+        </section>
 
-          {#if hasData('weekday')}
-          <div class="metrics-panel">
-            <div class="metrics-headline">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9E9E9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{@html ICONS.weekday}</svg>
-              <h3>Day of Week</h3>
-            </div>
-            <div class="metrics-list">
-              {#each getNormalizedWeekdays(queryData.weekday) as [label, count]}
-                <div class="bar-row">
-                  <div class="bar-fill" style="width: {percentRepr(count, categoryTotal('weekday'))}%"></div>
-                  <div class="bar-row-inner">
-                    <span class="bar-label">{label}</span>
-                    <span class="bar-value">{numberFormat(count)}</span>
-                    <span class="bar-pct">{percentLabel(count, categoryTotal('weekday'))}</span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </div>
-          {/if}
+        <!-- Dimension panels: fifth row -->
+        <section class="metrics-grid">
+          <MetricsPanel title="Screens" icon={ICONS.screen} data={queryData['screen'] ?? {}} />
+          <MetricsPanel title="Hour" icon={ICONS.hour} data={getNormalizedHours(queryData['hour'])} />
+        </section>
+
+        <!-- Dimension panels: sixth row -->
+        <section class="metrics-grid">
+          <MetricsPanel title="Day of Week" icon={ICONS.weekday} data={getNormalizedWeekdays(queryData['weekday'])} />
+          <div></div>
         </section>
 
       {:else if !queryLoading}
@@ -574,7 +356,8 @@
   .empty-data { text-align: center; padding: 60px 24px; color: #666; font-size: 16px; }
 
   .toolbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 12px 0; position: sticky; top: 53px; z-index: 99; }
-  .toolbar-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .toolbar-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .site-selector, .range-selector { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; transition: all 0.15s; }
   .chip:hover { background: #e5e7eb; }
@@ -585,35 +368,13 @@
   .card-label { font-size: 13px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .card-value { font-size: 28px; font-weight: 700; font-family: 'Nunito Sans', sans-serif; color: #111; }
 
-  /* Time-series chart styles */
   .chart-section { margin-top: 24px; }
-  .chart-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  .chart-container { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding-top: 10px; overflow-x: auto; }
-  .chart-bar-wrapper { display: flex; flex-direction: column; align-items: center; flex: 1 0 auto; min-width: 28px; }
-  .chart-bar { width: 100%; max-width: 32px; background: linear-gradient(180deg, #2563eb 0%, #60a5fa 100%); border-radius: 3px 3px 0 0; transition: height 0.3s ease; min-height: 2px; }
-  .chart-bar-wrapper:hover .chart-bar { background: linear-gradient(180deg, #1d4ed8 0%, #3b82f6 100%); }
-  .chart-label { font-size: 9px; color: #999; margin-top: 4px; white-space: nowrap; transform: rotate(-30deg); transform-origin: left center; }
 
   .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px; }
 
-  .metrics-panel { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-
-  .metrics-headline { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-  .metrics-headline h3 { font-size: 16px; font-family: 'Nunito Sans', sans-serif; font-weight: 700; color: #333; margin: 0; }
-  .metrics-headline svg { width: 20px; height: 20px; flex-shrink: 0; }
-
-  .metrics-list { display: flex; flex-direction: column; gap: 2px; }
-
-  .bar-row { position: relative; display: flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 18px; overflow: hidden; }
-  .bar-fill { position: absolute; left: 0; top: 0; height: 100%; background: #e7f6ff; border-radius: 18px; transition: width 0.3s ease; min-width: 4px; }
-  .bar-row-inner { position: relative; z-index: 1; display: flex; align-items: center; width: 100%; gap: 8px; }
-  .bar-label { flex: 1; font-size: 13px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bar-value { font-size: 13px; font-weight: 600; color: #111; white-space: nowrap; }
-  .bar-pct { font-size: 11px; color: #888; width: 36px; text-align: right; flex-shrink: 0; }
-
   @media (max-width: 768px) {
     .metrics-grid { grid-template-columns: 1fr; }
-    .toolbar-inner { flex-direction: column; }
-    .chart-label { font-size: 8px; }
+    .toolbar-inner { flex-direction: column; align-items: stretch; }
+    .toolbar-right { justify-content: space-between; }
   }
 </style>

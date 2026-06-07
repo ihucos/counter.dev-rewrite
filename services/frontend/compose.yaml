@@ -1,0 +1,23 @@
+services:
+  frontend:
+    build:
+      context: ./svelte-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    develop:
+      watch:
+        - action: sync
+          path: ./svelte-app/src
+          target: /app/src
+        - action: sync
+          path: ./svelte-app/public
+          target: /app/public
+        - action: rebuild
+          path: ./svelte-app/package.json
+        - action: rebuild
+          path: ./svelte-app/vite.config.js
+        - action: rebuild
+          path: ./svelte-app/Dockerfile
