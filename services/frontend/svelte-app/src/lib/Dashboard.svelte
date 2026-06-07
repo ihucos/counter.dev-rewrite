@@ -22,7 +22,6 @@
   let user = $state(null);
   let connectionStatus = $state('checking');
   let lastRefresh = $state(null);
-
   let visitLogs = $state([]);
   let logsLoading = $state(false);
 
@@ -60,7 +59,7 @@
     refreshTimer = setInterval(() => {
       if (selectedHostName) {
         loadQueryData(true);
-        loadLogs(true);
+        loadVisitLogs(true);
       }
     }, REFRESH_INTERVAL_MS);
   }
@@ -82,21 +81,6 @@
     }
   }
 
-  async function loadLogs(silent = false) {
-    if (!silent) logsLoading = true;
-    try {
-      const result = await api.getLogs(selectedHostName || undefined, 50);
-      visitLogs = result?.logs ?? [];
-      if (result?.logs?.length > 0) {
-        connectionStatus = 'connected';
-      }
-    } catch (e) {
-      if (!silent) console.error('Failed to load visit logs', e);
-    } finally {
-      if (!silent) logsLoading = false;
-    }
-  }
-
   onMount(async () => {
     checkConnection();
     try {
@@ -106,7 +90,7 @@
         selectedHostId = hosts[0].id;
         await Promise.all([
           loadQueryData(),
-          loadLogs(),
+          loadVisitLogs(),
         ]);
       }
       connectionStatus = 'connected';
@@ -145,6 +129,25 @@
     }
   }
 
+  async function loadVisitLogs(silent = false) {
+    if (!selectedHostName) return;
+    if (!silent) logsLoading = true;
+    try {
+      const response = await api.getVisitLogs(selectedHostName, 50);
+      visitLogs = response.logs || [];
+      if (response.sites_with_logs && response.sites_with_logs.length > 0) {
+        connectionStatus = 'connected';
+      }
+    } catch (e) {
+      console.error('Failed to load visit logs', e);
+      if (!silent) {
+        visitLogs = [];
+      }
+    } finally {
+      if (!silent) logsLoading = false;
+    }
+  }
+
   function selectRange(r) {
     range = r.key;
     if (r.days === null) {
@@ -165,8 +168,10 @@
 
   function selectHost(id) {
     selectedHostId = id;
-    loadQueryData();
-    loadLogs();
+    Promise.all([
+      loadQueryData(),
+      loadVisitLogs(),
+    ]);
   }
 
   function categoryTotal(category) {
@@ -376,10 +381,14 @@
           <div></div>
         </section>
 
-        <RecentVisits
-          logs={visitLogs}
-          hostName={selectedHostName ?? ''}
-        />
+        <!-- Recent visits section: shows live log entries from Redis -->
+        <section class="recent-visits-section">
+          {#if logsLoading}
+            <div class="loading-indicator">Loading recent visits...</div>
+          {:else}
+            <RecentVisits logs={visitLogs} hostName={selectedHostName ?? ''} />
+          {/if}
+        </section>
       {:else if !queryLoading}
         <div class="empty-data">No data available for this period.</div>
       {/if}
@@ -446,6 +455,11 @@
   .chart-section { margin-top: 24px; }
 
   .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; margin-bottom: 24px; }
+
+  .recent-visits-section {
+    margin-top: 24px;
+    margin-bottom: 48px;
+  }
 
   @media (max-width: 768px) {
     .metrics-grid { grid-template-columns: 1fr; }

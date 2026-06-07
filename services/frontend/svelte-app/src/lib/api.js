@@ -14,7 +14,7 @@
  *   /api/core/hosts/              - GET, POST (DRF ViewSet)
  *   /api/core/hosts/:id/          - GET, PATCH, DELETE (DRF ViewSet)
  *   /api/core/query/?site=X&...   - GET   (custom view)
- *   /api/core/logs/               - GET   (recent visit logs)
+ *   /api/core/logs/?site=X&...    - GET   (custom view, visit logs from Redis)
  */
 
 const API_BASE = '/api';
@@ -162,10 +162,10 @@ const api = {
     }));
   },
 
-  getLogs: (site, limit) => {
+  getVisitLogs: (site, limit = 30) => {
     return request('GET', buildUrl('/core/logs/', {
       site: site || undefined,
-      limit: limit || undefined,
+      limit: String(limit),
     }));
   },
 };

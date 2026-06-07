@@ -1,6 +1,6 @@
 <script>
   /**
-   * Displays recent visit log entries from the tracker.
+   * Displays recent visit log entries from the tracker's Redis logs.
    *
    * Props:
    *   logs: Array<{timestamp, date, time, country, referrer, device, platform, site, extra}>
@@ -10,7 +10,6 @@
 
   let filteredLogs = $derived.by(() => {
     if (!logs || logs.length === 0) return [];
-    // Filter by the selected host if it matches any
     if (hostName) {
       return logs.filter(l => l.site === hostName).slice(0, 50);
     }
@@ -47,15 +46,13 @@
 
   function getCountryFlag(countryCode) {
     if (!countryCode || countryCode === 'xx' || countryCode === '') return '';
-    // Use Unicode regional indicator emoji
     const code = countryCode.toUpperCase();
-    const offset = 0x1F1E6 - 65; // 'A' = 0x1F1E6
+    const offset = 0x1F1E6 - 65;
     return String.fromCodePoint(code.charCodeAt(0) + offset, code.charCodeAt(1) + offset);
   }
 
   function formatTimestamp(date, time) {
     if (!date) return '';
-    // Show relative time for today
     const today = new Date().toISOString().slice(0, 10);
     if (date === today && time) {
       return time;
@@ -95,7 +92,7 @@
                 {#if getCountryFlag(log.country)}
                   <span class="flag" title={log.country.toUpperCase()}>{getCountryFlag(log.country)}</span>
                 {:else}
-                  <span class="flag flag-unknown" title="Unknown">🌍</span>
+                  <span class="flag flag-unknown" title="Unknown">🌐</span>
                 {/if}
               </td>
               <td class="col-referrer" title={log.referrer}>{formatReferrer(log.referrer)}</td>
