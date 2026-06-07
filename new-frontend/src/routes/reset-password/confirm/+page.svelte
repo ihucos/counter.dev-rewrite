@@ -1,7 +1,6 @@
 <script>
-  import { onMount } from 'svelte';
-  import { api } from './api.js';
-  let { navigateTo } = $props();
+  import { page } from '$app/state';
+  import { api } from '$lib/api.js';
 
   let uid = $state('');
   let token = $state('');
@@ -10,13 +9,12 @@
   let error = $state('');
   let loading = $state(false);
   let done = $state(false);
-  let ready = $state(false);
 
-  onMount(() => {
-    const params = new URLSearchParams(window.location.search);
+  // Read query params from the URL
+  $effect(() => {
+    const params = page.url.searchParams;
     uid = params.get('uid') || '';
     token = params.get('token') || '';
-    ready = true;
   });
 
   async function handleConfirm() {
@@ -40,14 +38,12 @@
     <div class="logo"></div>
     <h1>Set New Password</h1>
 
-    {#if !ready}
-      <p>Loading...</p>
-    {:else if done}
+    {#if done}
       <div class="success">Password reset successfully!</div>
-      <button class="btn-primary" onclick={() => navigateTo('login')}>Sign In</button>
+      <a href="/" class="btn-primary" style="display:block;text-align:center;">Sign In</a>
     {:else if !uid || !token}
       <div class="error">Invalid or missing reset link.</div>
-      <button class="btn-primary" onclick={() => navigateTo('login')}>Back to Sign In</button>
+      <a href="/" class="btn-primary" style="display:block;text-align:center;">Back to Sign In</a>
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleConfirm(); }}>
         {#if error}<div class="error">{error}</div>{/if}

@@ -1,8 +1,8 @@
 <script>
-  import { onMount } from 'svelte';
-  import { api } from './api.js';
-  import Settings from './Settings.svelte';
-  import MetricsPanel from './MetricsPanel.svelte';
+  import { goto } from '$app/navigation';
+  import { api } from '$lib/api.js';
+  import Settings from '$lib/Settings.svelte';
+  import MetricsPanel from '$lib/MetricsPanel.svelte';
 
   let user = $state(null);
   let hosts = $state([]);
@@ -68,24 +68,29 @@
     return Object.values(queryData[cat]).reduce((a, b) => a + b, 0);
   }
 
-  function logout() {
-    api.logout().catch(() => {});
-    window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: false } }));
+  async function logout() {
+    try {
+      await api.logout();
+    } catch {
+      // ignore
+    }
+    goto('/');
   }
 
-  onMount(async () => {
-    try {
-      user = await api.getUser();
+  // Check auth and load data
+  $effect(() => {
+    api.getUser().then(async (u) => {
+      user = u;
       hosts = await api.getHosts();
       if (hosts.length > 0) {
         selectedHost = hosts[0];
         queryData = await api.query(selectedHost.name, startDate || undefined, endDate || undefined);
       }
-    } catch (e) {
-      error = e.message || 'Failed to load.';
-    } finally {
+    }).catch(() => {
+      goto('/');
+    }).finally(() => {
       loading = false;
-    }
+    });
   });
 </script>
 

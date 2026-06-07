@@ -1,6 +1,6 @@
 <script>
-  import { api } from './api.js';
-  let { navigateTo } = $props();
+  import { goto } from '$app/navigation';
+  import { api } from '$lib/api.js';
 
   let username = $state('');
   let email = $state('');
@@ -61,7 +61,7 @@
           <p>Your account is ready. Add an email later in settings for password recovery.</p>
         {/if}
       </div>
-      <button class="btn-primary" onclick={() => navigateTo('login')}>Go to Sign In</button>
+      <a href="/" class="btn-primary" style="display:block;text-align:center;">Go to Sign In</a>
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }}>
         {#if error}<div class="error">{error}</div>{/if}
@@ -90,7 +90,7 @@
 
       <p class="footer-text">
         Already have an account?
-        <button class="link-btn" onclick={() => navigateTo('login')}>Sign In</button>
+        <a href="/" class="link-btn">Sign In</a>
       </p>
     {/if}
   </div>

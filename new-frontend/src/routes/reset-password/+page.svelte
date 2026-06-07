@@ -1,6 +1,5 @@
 <script>
-  import { api } from './api.js';
-  let { navigateTo } = $props();
+  import { api } from '$lib/api.js';
 
   let email = $state('');
   let error = $state('');
@@ -31,7 +30,7 @@
       <div class="success">
         If an account with that email exists, we've sent password reset instructions.
       </div>
-      <button class="btn-primary" onclick={() => navigateTo('login')}>Back to Sign In</button>
+      <a href="/" class="btn-primary" style="display:block;text-align:center;">Back to Sign In</a>
     {:else}
       <p class="desc">Enter your email and we'll send you a reset link.</p>
       <form onsubmit={(e) => { e.preventDefault(); handleReset(); }}>
@@ -45,7 +44,7 @@
         </button>
       </form>
       <p class="footer-text">
-        <button class="link-btn" onclick={() => navigateTo('login')}>Back to Sign In</button>
+        <a href="/" class="link-btn">Back to Sign In</a>
       </p>
     {/if}
   </div>

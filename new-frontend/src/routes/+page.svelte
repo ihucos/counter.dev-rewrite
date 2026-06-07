@@ -1,6 +1,6 @@
 <script>
-  import { api } from './api.js';
-  let { navigateTo } = $props();
+  import { goto } from '$app/navigation';
+  import { api } from '$lib/api.js';
 
   let username = $state('');
   let password = $state('');
@@ -22,13 +22,22 @@
     try {
       await api.login(username, password);
       flash('Welcome back!', 'success');
-      window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: true } }));
+      goto('/dashboard');
     } catch (e) {
       error = e.message || 'Login failed.';
     } finally {
       loading = false;
     }
   }
+
+  // Redirect to dashboard if already authenticated
+  $effect(() => {
+    api.getUser().then(() => {
+      goto('/dashboard');
+    }).catch(() => {
+      // not authenticated, stay on login
+    });
+  });
 </script>
 
 <div class="page">
@@ -67,13 +76,13 @@
       </button>
 
       <div class="links">
-        <button class="link-btn" onclick={() => navigateTo('reset-request')}>Forgot password?</button>
+        <a href="/reset-password" class="link-btn">Forgot password?</a>
       </div>
     </form>
 
     <p class="footer-text">
       Don't have an account?
-      <button class="link-btn" onclick={() => navigateTo('register')}>Sign Up</button>
+      <a href="/register" class="link-btn">Sign Up</a>
     </p>
   </div>
 </div>
