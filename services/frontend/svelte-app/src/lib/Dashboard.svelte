@@ -7,6 +7,8 @@
   import DownloadCSV from '$lib/DownloadCSV.svelte';
   import ConnectionStatus from '$lib/ConnectionStatus.svelte';
   import RecentVisits from '$lib/RecentVisits.svelte';
+  import TrafficSources from '$lib/TrafficSources.svelte';
+  import TimeSection from '$lib/TimeSection.svelte';
 
   let hosts = $state([]);
   let selectedHostId = $state(null);
@@ -211,33 +213,6 @@
     weekday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
     chart: '<path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/>',
   };
-
-  const HOUR_LABELS = {
-    0: '12 a.m.', 1: '1 a.m.', 2: '2 a.m.', 3: '3 a.m.',
-    4: '4 a.m.', 5: '5 a.m.', 6: '6 a.m.', 7: '7 a.m.',
-    8: '8 a.m.', 9: '9 a.m.', 10: '10 a.m.', 11: '11 a.m.',
-    12: '12 noon', 13: '1 p.m.', 14: '2 p.m.', 15: '3 p.m.',
-    16: '4 p.m.', 17: '5 p.m.', 18: '6 p.m.', 19: '7 p.m.',
-    20: '8 p.m.', 21: '9 p.m.', 22: '10 p.m.', 23: '11 p.m.',
-  };
-
-  function getNormalizedHours(hours) {
-    if (!hours) return {};
-    const pad = Object.fromEntries([...Array(24).keys()].map(i => [HOUR_LABELS[i], 0]));
-    const formatted = Object.fromEntries(
-      Object.entries(hours).map(([k, v]) => [HOUR_LABELS[k] || k, v])
-    );
-    return { ...pad, ...formatted };
-  }
-
-  const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  function getNormalizedWeekdays(weekdayData) {
-    if (!weekdayData) return {};
-    return Object.fromEntries(
-      WEEKDAY_LABELS.map((label, idx) => [label, weekdayData[String(idx)] || 0])
-    );
-  }
 </script>
 
 <div class="dashboard">
@@ -324,6 +299,7 @@
           <span class="refresh-badge">Auto-refreshing</span>
         </div>
 
+        <!-- Summary cards: pageviews, visits, referrers, countries -->
         <section class="summary-cards">
           <div class="card">
             <div class="card-label">Pageviews</div>
@@ -343,6 +319,10 @@
           </div>
         </section>
 
+        <!-- Traffic sources: visits, search engines, social, direct -->
+        <TrafficSources {queryData} />
+
+        <!-- Visit chart over time -->
         <section class="chart-section">
           <TimeSeriesChart
             dateData={queryData['date'] ?? {}}
@@ -351,34 +331,37 @@
           />
         </section>
 
+        <!-- Metrics panels: pages, page paths -->
         <section class="metrics-grid">
           <MetricsPanel title="Pages" icon={ICONS.page} data={queryData['page'] ?? {}} />
           <MetricsPanel title="Page Paths" icon={ICONS.loc} data={queryData['loc'] ?? {}} />
         </section>
 
+        <!-- Metrics panels: referrers, countries -->
         <section class="metrics-grid">
           <MetricsPanel title="Referrers" icon={ICONS.ref} data={queryData['ref'] ?? {}} />
           <MetricsPanel title="Countries" icon={ICONS.country} data={queryData['country'] ?? {}} />
         </section>
 
+        <!-- Metrics panels: browsers, operating systems -->
         <section class="metrics-grid">
           <MetricsPanel title="Browsers" icon={ICONS.browser} data={queryData['browser'] ?? {}} />
           <MetricsPanel title="Operating Systems" icon={ICONS.platform} data={queryData['platform'] ?? {}} />
         </section>
 
+        <!-- Metrics panels: devices, languages -->
         <section class="metrics-grid">
           <MetricsPanel title="Devices" icon={ICONS.device} data={queryData['device'] ?? {}} />
           <MetricsPanel title="Languages" icon={ICONS.lang} data={queryData['lang'] ?? {}} />
         </section>
 
+        <!-- Metrics panels: screens + time section with tabs -->
         <section class="metrics-grid">
           <MetricsPanel title="Screens" icon={ICONS.screen} data={queryData['screen'] ?? {}} />
-          <MetricsPanel title="Hour" icon={ICONS.hour} data={getNormalizedHours(queryData['hour'])} />
-        </section>
-
-        <section class="metrics-grid">
-          <MetricsPanel title="Day of Week" icon={ICONS.weekday} data={getNormalizedWeekdays(queryData['weekday'])} />
-          <div></div>
+          <TimeSection
+            hourData={queryData['hour'] ?? {}}
+            weekdayData={queryData['weekday'] ?? {}}
+          />
         </section>
 
         <!-- Recent visits section: shows live log entries from Redis -->
