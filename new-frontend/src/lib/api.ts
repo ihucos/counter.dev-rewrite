@@ -61,6 +61,15 @@ interface UpdateHostData { name?: string; host?: string; hide?: boolean; }
 
 const API_BASE = '/api';
 
+/**
+ * URL of the tracking script. Customizable via VITE_TRACKER_URL env var.
+ * Used to generate the tracking code snippet shown to users.
+ */
+export const TRACKER_URL =
+  typeof import.meta !== 'undefined' && import.meta.env?.VITE_TRACKER_URL
+    ? (import.meta.env.VITE_TRACKER_URL as string)
+    : 'https://cdn.counter.dev/script.js';
+
 function getCsrfToken(): string {
   const name = 'csrftoken';
   const value = '; ' + document.cookie;
