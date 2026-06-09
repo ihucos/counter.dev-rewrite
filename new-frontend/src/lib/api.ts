@@ -1,25 +1,6 @@
 /**
  * API client for the Django REST backend.
  * Uses session-based authentication (CSRF token from cookie).
- *
- * Endpoints:
- *   POST   /api/auth/login/
- *   POST   /api/auth/logout/
- *   GET    /api/auth/user/
- *   PATCH  /api/auth/user/
- *   POST   /api/auth/password/change/
- *   POST   /api/auth/password/reset/
- *   POST   /api/auth/password/reset/confirm/
- *   POST   /api/auth/registration/
- *   POST   /api/auth/registration/verify-email/
- *   POST   /api/auth/registration/resend-email/
- *   GET    /api/core/hosts/
- *   GET    /api/core/hosts/{id}/
- *   POST   /api/core/hosts/
- *   PUT    /api/core/hosts/{id}/
- *   PATCH  /api/core/hosts/{id}/
- *   DELETE /api/core/hosts/{id}/
- *   GET    /api/core/query/
  */
 
 export interface ApiError extends Error {
@@ -45,76 +26,38 @@ export interface HostData {
   user: number;
 }
 
-interface QueryResultItem {
-  item: string;
-  total: number;
-}
-
 export interface QueryResult {
-  [category: string]: QueryResultItem[];
+  [category: string]: Record<string, number>;
 }
 
-interface AuthResponse {
-  key?: string;
-  user?: UserData;
+export interface VisitLogEntry {
+  timestamp: string;
+  date: string;
+  time: string;
+  country: string;
+  referrer: string;
+  device: string;
+  platform: string;
+  site: string;
+  extra: string;
 }
 
-interface LoginData {
-  username: string;
-  password: string;
+export interface VisitLogsResponse {
+  logs: VisitLogEntry[];
+  sites_with_logs: string[];
 }
 
-interface RegisterData {
-  username: string;
-  email?: string;
-  password1: string;
-  password2: string;
-  timezone?: number;
-}
-
-interface VerifyEmailData {
-  key: string;
-}
-
-interface ResendEmailData {
-  email: string;
-}
-
-interface ChangePasswordData {
-  old_password: string;
-  new_password1: string;
-  new_password2: string;
-}
-
-interface RequestPasswordResetData {
-  email: string;
-}
-
-interface ConfirmPasswordResetData {
-  uid: string;
-  token: string;
-  new_password1: string;
-  new_password2: string;
-}
-
-interface UpdateUserData {
-  username?: string;
-  email?: string;
-  timezone?: string;
-  hide_hosts?: boolean;
-  prefs?: Record<string, unknown>;
-}
-
-interface CreateHostData {
-  name: string;
-  host?: string;
-}
-
-interface UpdateHostData {
-  name?: string;
-  host?: string;
-  hide?: boolean;
-}
+interface AuthResponse { key?: string; user?: UserData; }
+interface LoginData { username: string; password: string; }
+interface RegisterData { username: string; email?: string; password1: string; password2: string; timezone?: number; }
+interface VerifyEmailData { key: string; }
+interface ResendEmailData { email: string; }
+interface ChangePasswordData { old_password: string; new_password1: string; new_password2: string; }
+interface RequestPasswordResetData { email: string; }
+interface ConfirmPasswordResetData { uid: string; token: string; new_password1: string; new_password2: string; }
+interface UpdateUserData { username?: string; email?: string; timezone?: string; hide_hosts?: boolean; prefs?: Record<string, unknown>; }
+interface CreateHostData { name: string; host?: string; }
+interface UpdateHostData { name?: string; host?: string; hide?: boolean; }
 
 const API_BASE = '/api';
 
@@ -245,7 +188,16 @@ export const api = {
       start_date: startDate || undefined,
       end_date: endDate || undefined,
     } as Record<string, string | undefined>)),
+
+  // Visit logs (from Redis)
+  getVisitLogs: (site?: string, limit?: number): Promise<VisitLogsResponse | null> =>
+    request<VisitLogsResponse>('GET', buildUrl('/core/logs/', {
+      site: site || undefined,
+      limit: limit ? String(limit) : undefined,
+    } as Record<string, string | undefined>)),
 };
 
-// Also grab the host field from CreateHostData as optional in the interface
-export type { LoginData, RegisterData, CreateHostData, UpdateHostData, UpdateUserData, ChangePasswordData, RequestPasswordResetData, ConfirmPasswordResetData, QueryParams };
+export type {
+  LoginData, RegisterData, CreateHostData, UpdateHostData,
+  UpdateUserData, ChangePasswordData, RequestPasswordResetData, ConfirmPasswordResetData
+};

@@ -1,0 +1,26 @@
+#!/usr/bin/env uv run --script
+# /// script
+# dependencies = [
+#     "claudia-agent",
+# ]
+# [tool.uv.sources]
+# claudia-agent = { path = "/Users/ihucos/claudia" }
+# ///
+
+from claudia import Claudia
+
+PROMPT = "You are currently rewriting the frontend into svelte and migrating to the changed API. What is still missing? Implement one step towards this goal."
+
+
+for i in range(30):
+    claudia = Claudia()
+
+    @claudia.patch()
+    def get_prompts(self):
+        return [PROMPT]
+
+    @claudia.patch()
+    def ask_diff(self, *args, **kwargs):
+        return True 
+
+    claudia.start()
