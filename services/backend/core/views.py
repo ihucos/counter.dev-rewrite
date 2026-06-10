@@ -1,24 +1,24 @@
+import json
+import time
 from collections import defaultdict
+from datetime import date, datetime, timedelta
+from typing import Any, Optional
 from urllib.parse import unquote
 
 from django.core.cache import cache
 from django.db.models import Sum
+from django.http import StreamingHttpResponse
+from django.utils import timezone
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import get_object_or_404
-from rest_framework import viewsets, mixins
-from rest_framework.decorators import (
-    api_view,
-    permission_classes,
-)
+from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-
 from .models import Count, Host
-from .serializers import (
-    HostSerializer,
-    QueryRequestSerializer,
-)
+from .serializers import HostSerializer, QueryRequestSerializer
 
 
 class HostViewSet(
@@ -79,9 +79,6 @@ def visit_logs(request):
     """
     Retrieve recent visit log entries from Redis for sites owned by
     the authenticated user.
-
-    The tracker stores log lines as sorted sets in Redis with keys:
-        log:<origin>:<user_id>
 
     Each entry is a timestamped log line in the format:
         [YYYY-MM-DD HH:MM:SS] <country> <referrer> <device> <platform>
@@ -170,7 +167,6 @@ def parse_log_line(line):
     extra = " ".join(parts[4:]) if len(parts) > 4 else ""
 
     try:
-        from datetime import datetime
         ts = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
         date_str = ts.strftime("%Y-%m-%d")
         time_str = ts.strftime("%H:%M:%S")
@@ -188,3 +184,160 @@ def parse_log_line(line):
         "platform": platform,
         "extra": extra,
     }
+
+
+def _query_site_data(host: Host, start: date, end: date) -> dict[str, dict[str, int]]:
+    """Query aggregated data for a single host within a date range."""
+    qs = Count.objects.filter(host=host, date__gte=start, date__lte=end)
+    result: dict[str, dict[str, int]] = defaultdict(dict)
+    rows = qs.values("category", "item").annotate(total=Sum("total"))
+    for row in rows:
+        result[row["category"]][row["item"]] = row["total"]
+    return dict(result)
+
+
+def _get_user_logs(request, user, site: Optional[str] = None, limit: int = 50) -> list[dict[str, Any]]:
+    """Fetch recent visit logs from Redis for the user's sites."""
+    try:
+        redis = cache._cache.get_client()
+    except Exception:
+        return []
+
+    hosts = Host.objects.filter(user=user)
+    if site:
+        hosts = hosts.filter(name=site)
+
+    logs: list[dict[str, Any]] = []
+    for host in hosts:
+        log_key = f"log:{host.name}:{user.username}"
+        try:
+            entries = redis.zrevrange(log_key, 0, limit - 1, withscores=True)
+        except Exception:
+            continue
+
+        for entry_bytes, _ in entries:
+            try:
+                log_line = entry_bytes.decode("utf-8", errors="replace")
+            except Exception:
+                continue
+            log_entry = parse_log_line(log_line)
+            if log_entry:
+                log_entry["site"] = host.name
+                logs.append(log_entry)
+
+    logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return logs[:limit]
+
+
+def _build_dump_payload(request, user) -> dict[str, Any]:
+    """
+    Build a data dump payload similar to the old /dump SSE endpoint.
+
+    Returns a dict with:
+      - user: user info (uuid, prefs)
+      - meta: session info (utcoffset from query params)
+      - sites: dict keyed by host name, with visits for day, yesterday, all time
+    """
+    hosts = Host.objects.filter(user=user)
+    if user.hide_hosts:
+        hosts = hosts.filter(hide=False)
+
+    today = timezone.localdate()
+    yesterday = today - timedelta(days=1)
+
+    # Parse utcoffset from query params (default 0)
+    try:
+        utcoffset = int(request.GET.get("utcoffset", "0"))
+    except (ValueError, TypeError):
+        utcoffset = 0
+
+    sites_data: dict[str, dict[str, Any]] = {}
+    for host in hosts:
+        day_data = _query_site_data(host, today, today)
+        yesterday_data = _query_site_data(host, yesterday, yesterday)
+        all_data = _query_site_data(host, date(2000, 1, 1), today + timedelta(days=365))
+
+        # Fetch recent logs for this host
+        logs = _get_user_logs(request, user, site=host.name, limit=30)
+
+        sites_data[host.name] = {
+            "visits": {
+                "day": day_data,
+                "yesterday": yesterday_data,
+                "all": all_data,
+            },
+            "logs": logs,
+        }
+
+    return {
+        "user": {
+            "uuid": str(user.uuid) if user.uuid else "",
+            "prefs": {
+                "utcoffset": utcoffset,
+            },
+        },
+        "meta": {
+            "utcoffset": utcoffset,
+        },
+        "sites": sites_data,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dump_sse(request):
+    """
+    Server-Sent Events endpoint that streams aggregated data.
+
+    This replicates the old `/dump` SSE endpoint, providing real-time
+    aggregated data for the authenticated user.
+
+    Query params:
+        utcoffset (optional) - user's UTC offset (default: 0)
+
+    The endpoint sends two event types:
+      - "dump": full aggregated data payload (on connect and every ~15s)
+      - "archive": historical archive data (on connect)
+
+    On error or if user is not found, sends "nouser" event.
+
+    Usage on frontend:
+        const source = new EventSource('/api/core/dump/?utcoffset=1');
+        source.addEventListener('dump', (e) => {
+          const data = JSON.parse(e.data);
+          // update dashboard
+        });
+    """
+    user = request.user
+
+    def event_stream():
+        interval = 15  # seconds between refreshes
+
+        # Send initial dump immediately
+        try:
+            payload = _build_dump_payload(request, user)
+            yield f"event: dump\ndata: {json.dumps(payload)}\n\n"
+        except Exception:
+            yield "event: nouser\ndata: {}\n\n"
+            return
+
+        # Send archive event (empty for now, old archive logic can be added)
+        yield f"event: archive\ndata: {json.dumps({})}\n\n"
+
+        # Stream updates every `interval` seconds
+        while True:
+            time.sleep(interval)
+            try:
+                payload = _build_dump_payload(request, user)
+                yield f"event: dump\ndata: {json.dumps(payload)}\n\n"
+            except Exception:
+                yield "event: nouser\ndata: {}\n\n"
+                break
+
+    response = StreamingHttpResponse(
+        streaming_content=event_stream(),
+        content_type="text/event-stream",
+    )
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["X-Accel-Buffering"] = "no"
+    return response

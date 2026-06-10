@@ -8,6 +8,13 @@
   let loading = $state(true);
   let copySuccess = $state(false);
 
+  /** Polling for first visit detection */
+  let firstVisitLoading = $state(false);
+  let firstVisitDetected = $state(false);
+  let firstVisitError = $state('');
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let dashboardNavigating = $state(false);
+
   function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
   }
@@ -44,25 +51,92 @@
     }
   }
 
+  /**
+   * Poll the query endpoint for the first host to detect
+   * when the first visit arrives. Polls every 5 seconds,
+   * stops when data is found or navigates away.
+   */
+  function startPolling(): void {
+    if (hosts.length === 0) return;
+    if (pollTimer) return;
+
+    const hostName = hosts[0].name;
+
+    // Immediate check
+    pollOnce(hostName);
+
+    pollTimer = setInterval(() => {
+      pollOnce(hostName);
+    }, 5000);
+  }
+
+  async function pollOnce(hostName: string): Promise<void> {
+    firstVisitLoading = true;
+    firstVisitError = '';
+
+    try {
+      // Query recent data (last 7 days) to see if any visits arrived
+      const data = await api.query(hostName, undefined, undefined);
+
+      if (data) {
+        // Check if we have any data at all
+        const hasData = Object.values(data).some((category) => {
+          return category && typeof category === 'object' && Object.keys(category).length > 0;
+        });
+
+        if (hasData) {
+          // First visit detected! Navigate to dashboard
+          firstVisitDetected = true;
+          flash('First visit detected! Redirecting to dashboard...', 'success');
+          stopPolling();
+          dashboardNavigating = true;
+
+          setTimeout(() => {
+            goto('/dashboard');
+          }, 1200);
+        }
+      }
+    } catch (e) {
+      firstVisitError = (e as Error).message || 'Poll failed';
+      // Don't stop polling on transient errors
+    } finally {
+      firstVisitLoading = false;
+    }
+  }
+
+  function stopPolling(): void {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
   function goToDashboard(): void {
+    stopPolling();
     goto('/dashboard');
   }
 
-  // Check authentication and load user data
+  // Check authentication and load user data, then start polling
   $effect(() => {
     api.getUser().then(async (u) => {
       user = u;
       const h = await api.getHosts();
       hosts = h ?? [];
-      // If user already has sites with data, redirect to dashboard
+
       if (hosts.length > 0) {
+        // Check immediately if data already exists (redirect straight away)
         try {
           const data = await api.query(hosts[0].name, undefined, undefined);
           if (data && Object.keys(data).length > 0 && Object.values(data).some((v) => Object.keys(v).length > 0)) {
             goto('/dashboard');
             return;
           }
-        } catch { /* no data yet, show setup */ }
+        } catch {
+          // No data yet - will poll
+        }
+
+        // Start polling for first visit
+        startPolling();
       }
     }).catch(() => {
       // Not logged in, redirect to login
@@ -70,6 +144,11 @@
     }).finally(() => {
       loading = false;
     });
+
+    // Cleanup on component destroy
+    return () => {
+      stopPolling();
+    };
   });
 </script>
 
@@ -147,16 +226,30 @@
             </div>
           </div>
 
-          <div class="waiting">
-            <svg class="loader-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5">
-              <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
-            </svg>
-            <span>Waiting for first visit...</span>
-          </div>
+          {#if dashboardNavigating}
+            <!-- First visit detected - navigating to dashboard -->
+            <div class="waiting detected">
+              <svg class="check-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>First visit detected! Redirecting to dashboard...</span>
+            </div>
+          {:else}
+            <!-- Waiting for first visit with live polling -->
+            <div class="waiting">
+              <svg class="loader-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+              </svg>
+              <span>Waiting for first visit...</span>
+              {#if firstVisitLoading}
+                <span class="polling-hint">checking...</span>
+              {/if}
+            </div>
+          {/if}
 
           <div class="actions">
-            <button class="btn-primary" onclick={goToDashboard}>
+            <button class="btn-primary" onclick={goToDashboard} disabled={dashboardNavigating}>
               Go to Dashboard
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
@@ -311,6 +404,11 @@
     font-weight: 500;
     color: #0369a1;
   }
+  .waiting.detected {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+  }
   .loader-svg {
     animation: rotate 2s linear infinite;
     flex-shrink: 0;
@@ -318,6 +416,19 @@
   @keyframes rotate {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  .check-icon {
+    flex-shrink: 0;
+  }
+  .polling-hint {
+    font-size: 11px;
+    color: #7dd3fc;
+    font-weight: 400;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   .actions {
@@ -338,11 +449,12 @@
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.1s;
   }
-  .btn-primary:hover {
+  .btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(102,126,234,0.4);
   }
-  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
   .btn-primary svg { width: 18px; height: 18px; }
 
   .support {

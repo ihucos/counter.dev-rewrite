@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * Settings modal - manage hosts/sites, view tracking info, change password,
-   * configure timezone, hide_hosts preference, and logout.
+   * configure timezone, hide_hosts preference, delete account, and logout.
    */
   import { api, TRACKER_URL } from './api.js';
   import type { UserData, HostData } from './api.js';
@@ -33,6 +33,13 @@
   // Hide hosts preference
   let hideHostsPref = $state(false);
   let hidingHostsSaving = $state(false);
+
+  // Delete account
+  let deleteMode = $state<'hidden' | 'request' | 'confirm'>('hidden');
+  let deleteConfirmUsername = $state('');
+  let deleteError = $state('');
+  let deleting = $state(false);
+  let deleteDone = $state(false);
 
   const TIMEZONES = [
     { offset: -12, label: '[UTC-12:00] United States Minor Outlying Islands' },
@@ -80,6 +87,7 @@
     hideHostsPref = user?.hide_hosts ?? false;
     timezoneSaved = false;
     resetPasswordState();
+    resetDeleteState();
     open = true;
   }
 
@@ -89,6 +97,7 @@
     newSiteName = '';
     addError = '';
     resetPasswordState();
+    resetDeleteState();
   }
 
   function resetPasswordState(): void {
@@ -98,6 +107,14 @@
     pwdError = '';
     pwdSuccess = '';
     changingPwd = false;
+  }
+
+  function resetDeleteState(): void {
+    deleteMode = 'hidden';
+    deleteConfirmUsername = '';
+    deleteError = '';
+    deleting = false;
+    deleteDone = false;
   }
 
   async function copyTrackingCode(): Promise<void> {
@@ -215,6 +232,48 @@
     }
   }
 
+  /**
+   * Delete account flow:
+   *   1. User clicks "Delete account" -> deleteMode = 'request'
+   *   2. User types their username to confirm -> deleteMode = 'confirm'
+   *   3. API call is made to delete the account
+   */
+  function initiateDelete(): void {
+    resetDeleteState();
+    deleteMode = 'request';
+  }
+
+  function confirmDelete(): void {
+    if (!user) return;
+    if (deleteConfirmUsername.trim() !== user.username) {
+      deleteError = 'Username does not match. Please type your exact username to confirm.';
+      return;
+    }
+    deleteError = '';
+    deleteMode = 'confirm';
+    performDelete();
+  }
+
+  async function performDelete(): Promise<void> {
+    if (!user) return;
+    deleting = true;
+    deleteError = '';
+    try {
+      await api.deleteUser(user.username);
+      deleteDone = true;
+      flash('Account deleted. We\'re sorry to see you go!', 'info');
+      // Redirect to home after a brief delay
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    } catch (e) {
+      deleteError = (e as Error).message || 'Failed to delete account. Please try again or contact support.';
+      deleteMode = 'request';
+    } finally {
+      deleting = false;
+    }
+  }
+
   async function handleLogout(): Promise<void> {
     try {
       await api.logout();
@@ -329,7 +388,7 @@
         </div>
       </section>
 
-      <!-- Account -->
+      <!-- Account info + Delete account -->
       {#if user}
         <section>
           <h3>Account</h3>
@@ -337,9 +396,66 @@
             <div><strong>Username:</strong> {user.username}</div>
             <div><strong>Email:</strong> {user.email || '(not set)'}</div>
             {#if user.uuid}
-              <div><strong>Tracking ID:</strong> {user.uuid}</div>
+              <div><strong>Tracking ID:</strong> <code class="uuid-text">{user.uuid}</code></div>
             {/if}
           </div>
+
+          <!-- Delete account -->
+          {#if !deleteDone}
+            <div class="delete-section">
+              <h4 class="delete-title">Delete Account</h4>
+              <div class="danger-box">
+                {#if deleteMode === 'hidden'}
+                  <div class="delete-prompt">
+                    <div class="danger-message">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="alert-icon">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                      <span>Deleting your account removes all data you've collected!</span>
+                    </div>
+                    <button class="btn-danger" onclick={initiateDelete}>Delete account</button>
+                  </div>
+                {:else if deleteMode === 'request'}
+                  <div class="delete-confirm-form">
+                    {#if deleteError}
+                      <div class="error-msg">{deleteError}</div>
+                    {/if}
+                    <div class="confirm-row">
+                      <input
+                        type="text"
+                        bind:value={deleteConfirmUsername}
+                        placeholder="Type your username ({user.username}) to confirm"
+                        disabled={deleting}
+                        class="confirm-input"
+                      />
+                      <button
+                        class="btn-danger"
+                        onclick={confirmDelete}
+                        disabled={deleting || !deleteConfirmUsername.trim()}
+                      >
+                        {deleting ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                    <button class="btn-cancel" onclick={resetDeleteState}>Cancel</button>
+                  </div>
+                {:else if deleteMode === 'confirm' && deleting}
+                  <div class="delete-progress">
+                    <div class="spinner-small"></div>
+                    <span>Deleting your account...</span>
+                  </div>
+                {/if}
+              </div>
+            </div>
+          {:else}
+            <div class="delete-success">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <span>Account deleted. Redirecting...</span>
+            </div>
+          {/if}
+
           <button class="btn-logout" onclick={handleLogout}>Sign Out</button>
         </section>
       {/if}
@@ -428,6 +544,10 @@
     font-size: 14px; color: #555; line-height: 1.8; margin-bottom: 12px;
   }
   .user-info strong { color: #333; }
+  .uuid-text {
+    font-size: 12px; background: #f3f4f6; padding: 2px 6px;
+    border-radius: 4px; color: #666;
+  }
   .toggle-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 12px 14px; background: #f9fafb; border-radius: 8px;
@@ -455,6 +575,64 @@
   .btn-logout {
     background: none; border: 1px solid #e5e7eb; padding: 8px 20px;
     border-radius: 8px; cursor: pointer; font-size: 14px; color: #dc2626;
+    margin-top: 16px;
   }
   .btn-logout:hover { background: #fef2f2; border-color: #fca5a5; }
+
+  /* Delete account styles */
+  .delete-section { margin-top: 16px; }
+  .delete-title {
+    font-size: 13px; font-weight: 700; color: #dc2626;
+    margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .danger-box {
+    background: linear-gradient(135deg, #fef2f2 0%, #fef2f2 100%);
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .delete-prompt { display: flex; flex-direction: column; gap: 12px; }
+  .danger-message {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #991b1b; line-height: 1.5;
+  }
+  .alert-icon { width: 20px; height: 20px; flex-shrink: 0; color: #dc2626; }
+  .btn-danger {
+    background: #dc2626; color: white; border: none;
+    padding: 8px 20px; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; align-self: flex-start;
+    transition: background 0.15s;
+  }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+  .delete-confirm-form { display: flex; flex-direction: column; gap: 8px; }
+  .confirm-row { display: flex; gap: 8px; align-items: stretch; }
+  .confirm-input {
+    flex: 1; padding: 8px 12px; border: 1px solid #fecaca;
+    border-radius: 8px; font-size: 13px; background: white;
+  }
+  .confirm-input:focus {
+    outline: none; border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220,38,38,0.15);
+  }
+  .btn-cancel {
+    background: none; border: 1px solid #ddd; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; cursor: pointer; color: #666;
+    align-self: flex-start;
+  }
+  .btn-cancel:hover { background: #f5f5f5; }
+  .delete-progress {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #991b1b;
+  }
+  .spinner-small {
+    width: 16px; height: 16px; border: 2px solid #fecaca;
+    border-top-color: #dc2626; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .delete-success {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: #d4edda; color: #155724;
+    border-radius: 8px; font-size: 13px; margin-top: 8px;
+  }
 </style>

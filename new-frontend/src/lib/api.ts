@@ -165,6 +165,16 @@ export const api = {
   updateUser: (data: UpdateUserData): Promise<UserData | null> =>
     request<UserData>('PATCH', '/auth/user/', data),
 
+  /**
+   * Delete the authenticated user's account permanently.
+   * This requires confirming the username to match the configured
+   * backend validation.
+   * Sends a DELETE request to /auth/user/ with the username
+   * as confirmation payload.
+   */
+  deleteUser: (username: string): Promise<null> =>
+    request<null>('DELETE', '/auth/user/', { username } as { username: string }),
+
   changePassword: (data: ChangePasswordData): Promise<unknown | null> =>
     request<unknown>('POST', '/auth/password/change/', data),
 

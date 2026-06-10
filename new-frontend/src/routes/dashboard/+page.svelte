@@ -3,6 +3,8 @@
   import { api } from '$lib/api.js';
   import type { UserData, HostData } from '$lib/api.js';
   import type { VisitLogEntry } from '$lib/api.js';
+  import type { DumpPayload } from '$lib/live.js';
+  import { getLiveStream } from '$lib/live.js';
   import Settings from '$lib/Settings.svelte';
   import MetricsPanel from '$lib/MetricsPanel.svelte';
   import ConnectionStatus from '$lib/ConnectionStatus.svelte';
@@ -12,10 +14,22 @@
   import TimeSection from '$lib/TimeSection.svelte';
   import SourcesCountries from '$lib/SourcesCountries.svelte';
   import RecentVisits from '$lib/RecentVisits.svelte';
+  import Pwyw from '$lib/Pwyw.svelte';
 
   let user = $state<UserData | null>(null);
   let hosts = $state<HostData[]>([]);
   let selectedHostId = $state<number | null>(null);
+
+  /**
+   * Visible hosts: apply hide_hosts preference filtering.
+   * If the user has hide_hosts enabled, only show hosts where hide === false.
+   * Otherwise show all hosts.
+   */
+  let visibleHosts = $derived.by(() => {
+    if (!user?.hide_hosts) return hosts;
+    return hosts.filter(h => !h.hide);
+  });
+
   let selectedHostName = $derived.by(() => {
     if (!selectedHostId) return null;
     const h = hosts.find(h => h.id === selectedHostId);
@@ -30,8 +44,36 @@
   let visitLogs = $state<VisitLogEntry[]>([]);
   let logsLoading = $state(false);
 
+  // PWYW metrics
+  let pwywTotalDaysTracked = $state(0);
+  let pwywAverageDailyHits = $state(0);
+
   const REFRESH_INTERVAL_MS = 15000;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  // Tracks whether the current queryData came from a properly filtered
+  // API query (true) vs. from the live stream's "all" bucket (false).
+  // When true, incoming SSE dump events should NOT overwrite queryData
+  // (except for the "today" and "yesterday" ranges, where the SSE data
+  // is accurate).
+  let dataFromApiQuery = $state(false);
+
+  /**
+   * SVG icon paths for each MetricsPanel (matching old design).
+   * Each is a 24x24 viewBox SVG path content.
+   */
+  const ICONS = {
+    page: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+    loc: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    ref: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17V11"/>',
+    country: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    browser: '<circle cx="12" cy="12" r="3"/><path d="M12 21a9 9 0 0 0 9-9"/><path d="M12 3a9 9 0 0 0-9 9"/><circle cx="12" cy="12" r="9"/>',
+    platform: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22h6"/><path d="M12 17v2"/>',
+    device: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 22h8"/>',
+    lang: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+    screen: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+    hour: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    weekday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  };
 
   function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
@@ -52,12 +94,60 @@
     { key: 'all', label: 'All time', days: null as number | null },
   ];
 
+  /**
+   * Compute PWYW metrics by querying all hosts with all-time data.
+   */
+  async function computePwywMetrics(): Promise<void> {
+    if (!hosts || hosts.length === 0) return;
+
+    let maxDaysTracked = 0;
+    let totalLast7Hits = 0;
+    let hostsWithData = 0;
+
+    for (const host of hosts) {
+      try {
+        const allData = await api.query(host.name, undefined, undefined);
+        if (!allData) continue;
+
+        const dateData = allData['date'];
+        if (!dateData || Object.keys(dateData).length === 0) continue;
+
+        hostsWithData++;
+
+        const numDays = Object.keys(dateData).length;
+        if (numDays > maxDaysTracked) maxDaysTracked = numDays;
+
+        const sortedDates = Object.keys(dateData).sort().reverse();
+        const recent7 = sortedDates.slice(0, 7);
+        for (const d of recent7) {
+          totalLast7Hits += dateData[d] || 0;
+        }
+      } catch {
+        // Skip hosts that error
+      }
+    }
+
+    pwywTotalDaysTracked = maxDaysTracked;
+    pwywAverageDailyHits = hostsWithData > 0 ? Math.round(totalLast7Hits / 7) : 0;
+  }
+
+  /**
+   * Start the auto-refresh timer.
+   *
+   * Always refreshes visit logs. Query data is refreshed via the timer
+   * only if SSE is not connected. SSE provides real-time data for
+   * "today" and "yesterday" ranges; for other ranges, the timer calls
+   * the API query with proper date filtering.
+   */
   function startAutoRefresh(): void {
     stopAutoRefresh();
     refreshTimer = setInterval(() => {
       if (selectedHostName) {
-        loadQueryData(true);
         loadVisitLogs(true);
+        // Always refresh query data so date-filtered views stay accurate.
+        // This also ensures "last7", "last30", and "all" ranges get
+        // properly filtered data from the API.
+        loadQueryData(true);
       }
     }, REFRESH_INTERVAL_MS);
   }
@@ -79,11 +169,114 @@
     }
   }
 
+  /**
+   * Handle incoming live data from the SSE/polling stream.
+   *
+   * For "today" and "yesterday" ranges, the SSE payload's `day` and
+   * `yesterday` buckets are accurate and can overwrite queryData.
+   *
+   * For other ranges ("last7", "last30", "all"), the SSE payload only
+   * has the `all` bucket, which may not reflect the selected range.
+   * In these cases, we only update queryData from the SSE payload when
+   * the current data hasn't come from a properly filtered API query
+   * (i.e., on initial load or after a range switch before the API
+   * query completes).
+   */
+  function handleLiveDump(payload: DumpPayload): void {
+    if (!selectedHostName) return;
+    const siteData = payload.sites[selectedHostName];
+    if (!siteData) return;
+
+    // Update recent logs from live data immediately
+    if (siteData.logs && siteData.logs.length > 0) {
+      visitLogs = siteData.logs;
+    }
+
+    // Decide whether to update queryData from SSE data.
+    // For "today" and "yesterday", the SSE data is range-accurate.
+    // For other ranges, only apply SSE data if we don't already have
+    // properly filtered data from the API query.
+    const shouldApplySseData =
+      range === 'today' ||
+      range === 'yesterday' ||
+      !dataFromApiQuery;
+
+    if (shouldApplySseData) {
+      let sseData: Record<string, Record<string, number>> | null = null;
+      if (range === 'today') {
+        sseData = siteData.visits.day ?? null;
+      } else if (range === 'yesterday') {
+        sseData = siteData.visits.yesterday ?? null;
+      } else {
+        sseData = siteData.visits.all ?? null;
+      }
+
+      if (sseData && Object.keys(sseData).length > 0) {
+        queryData = sseData;
+      }
+    }
+
+    connectionStatus = 'connected';
+    lastRefresh = new Date();
+  }
+
+  function handleLiveConnected(): void {
+    connectionStatus = 'connected';
+  }
+
+  function handleLiveDisconnected(): void {
+    connectionStatus = 'disconnected';
+  }
+
+  function handleLiveError(): void {
+    // Don't immediately disconnect on error - the live stream will fall back to polling
+  }
+
+  /**
+   * Initialize the live stream for real-time data.
+   * Returns a cleanup function that unsubscribes and stops the stream.
+   */
+  function initLiveStream(): (() => void) | undefined {
+    if (!hosts.length) return;
+
+    const stream = getLiveStream();
+    stream.setHosts(hosts);
+
+    const unsub = stream.subscribe((event) => {
+      switch (event.type) {
+        case 'dump':
+          handleLiveDump(event.data as DumpPayload);
+          break;
+        case 'connected':
+          handleLiveConnected();
+          break;
+        case 'disconnected':
+          handleLiveDisconnected();
+          break;
+        case 'error':
+          handleLiveError();
+          break;
+        case 'nouser':
+          goto('/');
+          break;
+      }
+    });
+
+    stream.start();
+
+    // Return cleanup function to be called on component destroy
+    return () => {
+      unsub();
+      stream.stop();
+    };
+  }
+
   async function loadQueryData(silent = false): Promise<void> {
     if (!selectedHostName) return;
     if (!silent) queryLoading = true;
     try {
       queryData = await api.query(selectedHostName, startDate || undefined, endDate || undefined);
+      dataFromApiQuery = true;
       lastRefresh = new Date();
       connectionStatus = 'connected';
     } catch (e) {
@@ -120,11 +313,14 @@
     else if (r.days === 0) { startDate = today(); endDate = today(); }
     else if (r.from !== undefined) { startDate = daysAgo(r.from); endDate = daysAgo(r.to); }
     else { startDate = daysAgo(r.days); endDate = today(); }
+    // Reset the flag so SSE data can fill in until the API query completes
+    dataFromApiQuery = false;
     loadQueryData();
   }
 
   function selectHost(id: number): void {
     selectedHostId = id;
+    dataFromApiQuery = false;
     Promise.all([loadQueryData(), loadVisitLogs()]);
   }
 
@@ -149,16 +345,25 @@
     goto('/');
   }
 
-  // Initialize on mount
+  // Initialize on mount and clean up on destroy
   $effect(() => {
     checkConnection();
+
+    let liveCleanup: (() => void) | undefined;
+
     api.getUser().then(async (u) => {
       user = u;
       const h = await api.getHosts();
       hosts = h ?? [];
-      if (hosts.length > 0) {
-        selectedHostId = hosts[0].id;
+      // Initialize live stream with hosts data and store cleanup
+      liveCleanup = initLiveStream();
+
+      // Select first visible host
+      const targetHosts = u?.hide_hosts ? (h ?? []).filter(host => !host.hide) : (h ?? []);
+      if (targetHosts.length > 0) {
+        selectedHostId = targetHosts[0].id;
         await Promise.all([loadQueryData(), loadVisitLogs()]);
+        computePwywMetrics();
       }
       connectionStatus = 'connected';
       startAutoRefresh();
@@ -168,7 +373,12 @@
       loading = false;
     });
 
-    return () => { stopAutoRefresh(); };
+    return () => {
+      stopAutoRefresh();
+      if (liveCleanup) {
+        liveCleanup();
+      }
+    };
   });
 </script>
 
@@ -208,11 +418,14 @@
       <div class="content toolbar-inner">
         <div class="toolbar-left">
           <div class="site-selector">
-            {#each hosts as host (host.id)}
+            {#each visibleHosts as host (host.id)}
               <button class="chip" class:active={selectedHostId === host.id} onclick={() => selectHost(host.id)}>
                 {host.name}
               </button>
             {/each}
+            {#if visibleHosts.length === 0}
+              <span class="no-visible-hosts">No visible websites. Check your Settings.</span>
+            {/if}
           </div>
         </div>
         <div class="toolbar-right">
@@ -233,7 +446,7 @@
     <main class="content">
       {#if queryLoading}
         <div class="loading-indicator">Loading data...</div>
-      {:else if queryData && Object.keys(queryData).length > 0}
+      {:else if selectedHostName && queryData && Object.keys(queryData).length > 0}
         <div class="refresh-indicator">
           {#if lastRefresh}
             <span class="refresh-time">Last updated: {formatRefreshTime(lastRefresh)}</span>
@@ -261,7 +474,7 @@
           </div>
         </section>
 
-        <!-- Traffic sources: visits, search engines, social, direct -->
+        <!-- Traffic sources -->
         <TrafficSources queryData={queryData ?? {}} />
 
         <!-- Visit chart over time -->
@@ -273,13 +486,13 @@
           />
         </section>
 
-        <!-- Metrics: pages, page paths -->
+        <!-- Pages and Page Paths with icons -->
         <section class="metrics-grid">
-          <MetricsPanel title="Pages" data={queryData['page'] ?? {}} />
-          <MetricsPanel title="Page Paths" data={queryData['loc'] ?? {}} />
+          <MetricsPanel title="Pages" icon={ICONS.page} data={queryData['page'] ?? {}} />
+          <MetricsPanel title="Page Paths" icon={ICONS.loc} data={queryData['loc'] ?? {}} />
         </section>
 
-        <!-- Sources & Countries - enhanced panel -->
+        <!-- Sources & Countries -->
         <section class="sources-countries-section">
           <SourcesCountries
             refData={queryData['ref'] ?? {}}
@@ -287,28 +500,28 @@
           />
         </section>
 
-        <!-- Metrics: browsers, operating systems -->
+        <!-- Browsers and Operating Systems with icons -->
         <section class="metrics-grid">
-          <MetricsPanel title="Browsers" data={queryData['browser'] ?? {}} />
-          <MetricsPanel title="Operating Systems" data={queryData['platform'] ?? {}} />
+          <MetricsPanel title="Browsers" icon={ICONS.browser} data={queryData['browser'] ?? {}} />
+          <MetricsPanel title="Operating Systems" icon={ICONS.platform} data={queryData['platform'] ?? {}} />
         </section>
 
-        <!-- Metrics: devices, languages -->
+        <!-- Devices and Languages with icons -->
         <section class="metrics-grid">
-          <MetricsPanel title="Devices" data={queryData['device'] ?? {}} />
-          <MetricsPanel title="Languages" data={queryData['lang'] ?? {}} />
+          <MetricsPanel title="Devices" icon={ICONS.device} data={queryData['device'] ?? {}} />
+          <MetricsPanel title="Languages" icon={ICONS.lang} data={queryData['lang'] ?? {}} />
         </section>
 
-        <!-- Metrics: screens + time section with tabs -->
+        <!-- Screens with icon + Time section -->
         <section class="metrics-grid">
-          <MetricsPanel title="Screens" data={queryData['screen'] ?? {}} />
+          <MetricsPanel title="Screens" icon={ICONS.screen} data={queryData['screen'] ?? {}} />
           <TimeSection
             hourData={queryData['hour'] ?? {}}
             weekdayData={queryData['weekday'] ?? {}}
           />
         </section>
 
-        <!-- Recent visits section -->
+        <!-- Recent visits -->
         <section class="recent-visits-section">
           {#if logsLoading}
             <div class="loading-indicator">Loading recent visits...</div>
@@ -316,6 +529,16 @@
             <RecentVisits logs={visitLogs} hostName={selectedHostName ?? ''} />
           {/if}
         </section>
+
+        <!-- Pay What You Want -->
+        {#if user}
+          <Pwyw
+            totalDaysTracked={pwywTotalDaysTracked}
+            averageDailyHits={pwywAverageDailyHits}
+            userId={user.pk}
+            isSubscribed={false}
+          />
+        {/if}
       {:else if !queryLoading}
         <div class="empty-data">No data available for this period.</div>
       {/if}
@@ -356,6 +579,7 @@
   .chip { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; transition: all 0.15s; }
   .chip:hover { background: #e5e7eb; }
   .chip.active { background: #2563eb; color: white; border-color: #2563eb; }
+  .no-visible-hosts { font-size: 13px; color: #999; padding: 6px 0; }
 
   .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 24px; }
   .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }

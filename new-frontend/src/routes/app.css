@@ -1,21 +1,59 @@
+/* =========== Counter.dev - Global Base Styles =========== */
+
+/* Import Nunito Sans + Poppins (matching old design system) */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&family=Poppins:wght@700&display=swap');
+
+/* Reset */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 25px;
+  color: #121212;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f0f2f5;
-  color: #1a1a2e;
+  background: #f5f5f5;
 }
 
+/* Typography - headings use Poppins Bold like the old design */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.3;
+}
+
+h1 {
+  font-size: 72px;
+  line-height: 96px;
+}
+
+h2 {
+  font-size: 37px;
+  line-height: 48px;
+}
+
+h3 {
+  font-size: 22px;
+  line-height: 30px;
+}
+
+/* Links */
 a {
-  color: #4361ee;
+  color: #147efb;
   text-decoration: none;
 }
 
@@ -23,6 +61,234 @@ a:hover {
   text-decoration: underline;
 }
 
+a:active {
+  color: #0d5cb7;
+}
+
+/* Buttons */
 button {
   font-family: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Code */
+code, pre {
+  font-family: 'SF Mono', 'Consolas', 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+::selection {
+  background: #e7f6ff;
+  color: #147efb;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid #147efb;
+  outline-offset: 2px;
+}
+
+/* Placeholder styling */
+::-webkit-input-placeholder { color: #9e9e9e; }
+::-moz-placeholder { color: #9e9e9e; opacity: 1; }
+:-ms-input-placeholder { color: #9e9e9e !important; }
+::placeholder { color: #9e9e9e; }
+
+/* Utility classes */
+.content {
+  max-width: 1110px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Caption / small text */
+.caption,
+.caption-strong {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.caption-strong {
+  font-weight: 700;
+}
+
+/* Color utility classes matching old design system */
+.white { color: #ffffff; }
+.black { color: #121212; }
+.blue { color: #147efb; }
+.red { color: #fc3158; }
+.green { color: #53d769; }
+.yellow { color: #fecb2e; }
+.gray { color: #616161; }
+.light-gray { color: #9e9e9e; }
+.danger { color: #dc2626; }
+
+/* Background utilities */
+.bg-gray { background-color: #fafafa; }
+.bg-white { background-color: #ffffff; }
+.bg-blue { background-color: #e7f6ff; }
+.bg-dark-blue { background-color: #147efb; }
+
+/* Border radius */
+.radius-sm { border-radius: 3px; }
+.radius-lg { border-radius: 16px; }
+
+/* Shadows */
+.shadow-sm { box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.04); }
+.shadow-lg { box-shadow: 0px 24px 24px rgba(0, 0, 0, 0.03); }
+
+/* Flex helper */
+.flex { display: flex; }
+
+/* Full width */
+.width-full { width: 100%; }
+.width-half { width: 50%; }
+
+/* Spacing utilities */
+.mt8 { margin-top: 8px; }
+.mt16 { margin-top: 16px; }
+.mt24 { margin-top: 24px; }
+.mt32 { margin-top: 32px; }
+.mt40 { margin-top: 40px; }
+.mt48 { margin-top: 48px; }
+.mt56 { margin-top: 56px; }
+.mt64 { margin-top: 64px; }
+.mb8 { margin-bottom: 8px; }
+.mb16 { margin-bottom: 16px; }
+.mb24 { margin-bottom: 24px; }
+.mb32 { margin-bottom: 32px; }
+.mb40 { margin-bottom: 40px; }
+.mb48 { margin-bottom: 48px; }
+.mb56 { margin-bottom: 56px; }
+.mb64 { margin-bottom: 64px; }
+
+/* Input base styles matching old design system */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+textarea,
+select {
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 18px;
+  color: #121212;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+textarea:hover,
+select:hover {
+  border-color: #bdbdbd;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #147efb;
+  box-shadow: 0 0 0 3px rgba(20, 126, 251, 0.15);
+}
+
+textarea:disabled,
+input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* Select arrow */
+select {
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%239E9E9E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+}
+
+/* Remove IE/Edge select arrow */
+select::-ms-expand {
+  display: none;
+}
+
+/* Label base */
+label {
+  font-size: 14px;
+  line-height: 20px;
+  color: #616161;
+  display: block;
+  margin-bottom: 4px;
+}
+
+label input,
+label textarea,
+label select {
+  margin-top: 6px;
+}
+
+/* Horizontal rule */
+hr {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 24px 0;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive breakpoint helpers */
+@media (max-width: 1110px) {
+  .content {
+    width: 100%;
+    padding: 0 16px;
+  }
+}
+
+/* Print */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
 }

@@ -12,7 +12,8 @@ from claudia import Claudia
 PROMPT = "You are currently rewriting the frontend into svelte and migrating to the changed API. What is still missing? Implement one step towards this goal."
 
 
-for i in range(30):
+for i in range(100):
+    
     claudia = Claudia()
 
     @claudia.patch()
@@ -23,4 +24,7 @@ for i in range(30):
     def ask_diff(self, *args, **kwargs):
         return True 
 
-    claudia.start()
+    try:
+        claudia.start()
+    except Exception as exc:
+        print("XXXXXXXXXX", exc) 

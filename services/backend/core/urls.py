@@ -10,4 +10,5 @@ urlpatterns = [
     path("", include(router.urls)),
     path("query/", views.query, name="query"),
     path("logs/", views.visit_logs, name="visit-logs"),
+    path("dump/", views.dump_sse, name="dump-sse"),
 ]

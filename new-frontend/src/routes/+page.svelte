@@ -7,9 +7,22 @@
   let error = $state('');
   let loading = $state(false);
   let showPassword = $state(false);
+  let showResendForm = $state(false);
+  let resendEmail = $state('');
+  let resending = $state(false);
+  let resendDone = $state(false);
+  let resendError = $state('');
 
   function flash(msg: string, type: string = 'info'): void {
     window.dispatchEvent(new CustomEvent('flash', { detail: { message: msg, type } }));
+  }
+
+  function resetState(): void {
+    error = '';
+    showResendForm = false;
+    resendEmail = '';
+    resendDone = false;
+    resendError = '';
   }
 
   async function handleLogin(): Promise<void> {
@@ -28,12 +41,35 @@
       if (apiErr.status === 400) {
         error = apiErr.message || 'Invalid username or password.';
       } else if (apiErr.status === 403) {
-        error = 'Account not verified. Please check your email for a verification link.';
+        error = 'Account not verified. Please check your email for a verification link. '
+          + 'Need a new link? ';
+        showResendForm = true;
+        // Pre-fill resend email if we have it from the error
+        resendEmail = username; // best guess
       } else {
         error = apiErr.message || 'Login failed. Please try again.';
       }
     } finally {
       loading = false;
+    }
+  }
+
+  async function handleResend(): Promise<void> {
+    resendError = '';
+    resendDone = false;
+    if (!resendEmail.trim()) {
+      resendError = 'Please enter your email address.';
+      return;
+    }
+    resending = true;
+    try {
+      await api.resendVerificationEmail(resendEmail.trim());
+      resendDone = true;
+      flash('Verification email sent!', 'success');
+    } catch (e) {
+      resendError = (e as Error).message || 'Failed to resend.';
+    } finally {
+      resending = false;
     }
   }
 
@@ -53,13 +89,17 @@
     <h1>Sign In</h1>
 
     <form onsubmit={(e: Event) => { e.preventDefault(); handleLogin(); }}>
-      {#if error}
+      {#if error && !showResendForm}
         <div class="error">{error}</div>
+      {:else if error && showResendForm}
+        <div class="error not-verified">
+          <span>Account not verified. Please check your email for a verification link.</span>
+        </div>
       {/if}
 
       <label>
         Username
-        <input type="text" bind:value={username} placeholder="Your username" required disabled={loading} autocomplete="username" />
+        <input type="text" bind:value={username} placeholder="Your username" required disabled={loading} autocomplete="username" oninput={resetState} />
       </label>
 
       <label>
@@ -72,6 +112,7 @@
             required
             disabled={loading}
             autocomplete="current-password"
+            oninput={resetState}
           />
           <button type="button" class="toggle" onclick={() => showPassword = !showPassword} aria-label={showPassword ? 'Hide password' : 'Show password'} tabindex="-1">
             {#if showPassword}
@@ -97,6 +138,32 @@
         <a href="/reset-password" class="link-btn">Forgot password?</a>
       </div>
     </form>
+
+    {#if showResendForm}
+      <div class="resend-section">
+        <div class="divider"><span>Need a new verification email?</span></div>
+        {#if resendDone}
+          <div class="resend-success">
+            Verification email sent! Please check your inbox (including spam folder).
+          </div>
+        {:else}
+          {#if resendError}
+            <div class="resend-error">{resendError}</div>
+          {/if}
+          <div class="resend-form">
+            <input
+              type="email"
+              bind:value={resendEmail}
+              placeholder="Enter your email address"
+              disabled={resending}
+            />
+            <button class="btn-secondary" onclick={handleResend} disabled={resending || !resendEmail.trim()}>
+              {resending ? 'Sending...' : 'Resend Email'}
+            </button>
+          </div>
+        {/if}
+      </div>
+    {/if}
 
     <p class="footer-text">
       Don't have an account?
@@ -141,11 +208,58 @@
   }
   .btn-primary:hover:not(:disabled) { background: #1d4ed8; }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-secondary {
+    background: #f3f4f6; color: #333; border: 1px solid #ddd;
+    padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer;
+    font-weight: 600; white-space: nowrap;
+  }
+  .btn-secondary:hover:not(:disabled) { background: #e5e7eb; }
+  .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
   .error {
     background: #fef2f2; color: #dc2626; padding: 12px; border-radius: 6px;
     margin-bottom: 16px; font-size: 14px;
   }
+  .not-verified { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
   .links { text-align: center; margin-top: 12px; }
+
+  .resend-section {
+    margin-top: 20px;
+    padding-top: 16px;
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #888;
+  }
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+  }
+  .resend-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .resend-form input {
+    flex: 1;
+    margin-top: 0;
+    font-size: 14px;
+  }
+  .resend-success {
+    background: #d4edda; color: #155724; padding: 12px;
+    border-radius: 6px; font-size: 14px;
+  }
+  .resend-error {
+    background: #fef2f2; color: #dc2626; padding: 8px 12px;
+    border-radius: 6px; margin-bottom: 12px; font-size: 13px;
+  }
+
   .footer-text { margin-top: 24px; text-align: center; font-size: 14px; color: #666; }
   .link-btn {
     background: none; border: none; color: #2563eb; cursor: pointer;
