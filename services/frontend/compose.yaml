@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./static:/usr/share/nginx/html
+
+      # List individual dirs of ./out here
+      - ./out/blog:/usr/share/nginx/html/blog
+      - ./out/help:/usr/share/nginx/html/help
+      - ./out/pages:/usr/share/nginx/html/pages
