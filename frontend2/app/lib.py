@@ -8,12 +8,12 @@ class LiveElementContext:
         self.dom_element = dom_element
         self.builder = builder
 
-    def __getattr__(self, attribute_name):
-        # We preserve this just in case you want to chain other properties,
-        # but class handling is now primarily driven via the `klass` keyword.
-        normalized = attribute_name.replace("_", "-")
-        self.dom_element.classList.add(normalized)
-        return self
+    # def __getattr__(self, attribute_name):
+    #     # We preserve this just in case you want to chain other properties,
+    #     # but class handling is now primarily driven via the `klass` keyword.
+    #     normalized = attribute_name.replace("_", "-")
+    #     self.dom_element.classList.add(normalized)
+    #     return self
 
     def __call__(self, text=None, klass=None, **kwargs):
         # 1. Handle explicit 'klass' parameter if provided
@@ -58,6 +58,8 @@ class HtmlBuilder:
 
     def __init__(self, target=None):
         self.stack = []
+        if isinstance(target, str):
+            target = document.querySelector(target)
         self.target = target or document.body
 
     def __getattr__(self, tag_name):
