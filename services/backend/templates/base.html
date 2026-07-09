@@ -1,0 +1,54 @@
+{% load static %}<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{% block title %}Counter: Easy Web Analytics{% endblock %}</title>
+    {% block head_meta %}
+    <meta
+      name="description"
+      content="Track website visitors with Counter, a privacy-friendly
+      analytics tool. Get daily unique visitor counts, referrer information,
+      and geographical locations. Our open source web analytics tool makes it
+      easy to understand your web traffic. Get started today and pay what and
+      when you want!"
+    />
+    {% endblock %}
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {% block head_css %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}" />
+    {% endblock %}
+    <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@700&display=swap" rel="stylesheet" />
+    {% block head_extra %}{% endblock %}
+  </head>
+  <body>
+    {% block notification %}
+    <section class="notification">
+      <div class="content">
+        <span>Stop the war. Show your solidarity with a banner 🇺🇦</span>
+      </div>
+    </section>
+    {% endblock %}
+
+    {% block navbar %}
+    <base-navbar></base-navbar>
+    {% endblock %}
+
+    {% block content %}{% endblock %}
+
+    {% block footer %}
+    <base-footer></base-footer>
+    {% endblock %}
+
+    {% block scripts %}
+    <script src="{% static 'js/utils.js' %}"></script>
+    <script src="{% static 'components/_base.js' %}"></script>
+    <script src="{% static 'components/base/editaccount.js' %}"></script>
+    <script src="{% static 'components/base/navbar.js' %}"></script>
+    <script src="{% static 'components/base/footer.js' %}"></script>
+    <script src="{% static 'components/base/pwyw.js' %}"></script>
+    <script src="{% static 'components/counter-flash.js' %}"></script>
+    {% endblock %}
+    {% block scripts_extra %}{% endblock %}
+  </body>
+</html>
