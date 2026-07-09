@@ -1,45 +1,36 @@
-from lib import HtmlBuilder, t
+# from base import Element  # content, head
+from lib import Element
 
-from base import content
+
+t = Element("head")
+with t:
+    t.title("Counter: Welcome")
+    t.meta(
+        name="description",
+        content="Web Analytics made simple and therefore privacy-friendly.",
+    )
+    t.meta(name="viewport", content="width=device-width, initial-scale=1")
+    t.link(rel="shortcut icon", href="img/favicon.png")
+    t.link(
+        href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@700&display=swap",
+        rel="stylesheet",
+    )
+    t.link(
+        rel="stylesheet",
+        type="text/css",
+        href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.css",
+    )
+    t.script(src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js")
+    t.script(
+        src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.js"
+    )
+    t.script(src="js/utils.js")
+    t.script(src="/load.js")
+    t.link(rel="stylesheet", type="text/css", href="css/welcome.css")
 
 
-# with t.html(lang="en"):
-#     with t.head:
-#         t.meta(charset="utf-8")
-#         t.title("Counter: Welcome")
-#         t.meta(
-#             name="description",
-#             content="Web Analytics made simple and therefore privacy-friendly.",
-#         )
-#         t.meta(name="viewport", content="width=device-width, initial-scale=1")
-#         t.link(rel="stylesheet", type="text/css", href="css/welcome.css")
-#         t.link(rel="shortcut icon", href="img/favicon.png")
-#         t.link(
-#             href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@700&display=swap",
-#             rel="stylesheet",
-#         )
-#         t.link(
-#             rel="stylesheet",
-#             type="text/css",
-#             href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.css",
-#         )
-#         t.script(
-#             src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"
-#         )
-#         t.script(
-#             src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tabslet.js/1.7.3/jquery.tabslet.min.js"
-#         )
-#         t.script(
-#             src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.js"
-#         )
-#         t.script(src="js/utils.js")
-#         t.script(src="/load.js")
-#
-# t = HtmlBuilder(content.dom_element)
-
-# t = content
-
-with content:
+t = Element("body")
+with t:
     # Welcome page
     with t.section(klass="welcome"):
         with t.div(klass="content"):

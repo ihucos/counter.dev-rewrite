@@ -6,6 +6,7 @@ from . import views
 router = DefaultRouter()
 router.register(r"hosts", views.HostViewSet, basename="host")
 
+
 urlpatterns = [
     path("", include(router.urls)),
     path("query/", views.query, name="query"),

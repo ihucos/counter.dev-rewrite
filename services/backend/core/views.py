@@ -9,6 +9,7 @@ from django.core.cache import cache
 from django.db.models import Sum
 from django.http import StreamingHttpResponse
 from django.utils import timezone
+from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import get_object_or_404
@@ -133,10 +134,12 @@ def visit_logs(request):
     logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     logs = logs[:limit]
 
-    return Response({
-        "logs": logs,
-        "sites_with_logs": sites_with_logs,
-    })
+    return Response(
+        {
+            "logs": logs,
+            "sites_with_logs": sites_with_logs,
+        }
+    )
 
 
 def parse_log_line(line):
@@ -152,7 +155,7 @@ def parse_log_line(line):
             return None
         bracket_end = line.index("]")
         timestamp = line[1:bracket_end].strip()
-        rest = line[bracket_end + 1:].strip()
+        rest = line[bracket_end + 1 :].strip()
     except (ValueError, IndexError):
         return None
 
@@ -196,7 +199,9 @@ def _query_site_data(host: Host, start: date, end: date) -> dict[str, dict[str, 
     return dict(result)
 
 
-def _get_user_logs(request, user, site: Optional[str] = None, limit: int = 50) -> list[dict[str, Any]]:
+def _get_user_logs(
+    request, user, site: Optional[str] = None, limit: int = 50
+) -> list[dict[str, Any]]:
     """Fetch recent visit logs from Redis for the user's sites."""
     try:
         redis = cache._cache.get_client()

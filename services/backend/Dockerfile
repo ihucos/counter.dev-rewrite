@@ -27,10 +27,13 @@ ENV UV_PYTHON=python3.15
 ENV UV_LINK_MODE=copy
 ENV UV_COMPILE_BYTECODE=1
 
-# Copy application files
+COPY pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
 COPY . .
 
-# Sync dependencies using uv's cache mount for speed
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -39,4 +42,6 @@ EXPOSE 8000
 # Put the virtual environment's bin folder at the front of the PATH
 ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--access-logfile", "-", "--error-logfile", "-", "counter.wsgi:application"]
+# CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--access-logfile", "-", "--error-logfile", "-", "counter.wsgi:application"]
+ # XXXXXXXXXXXXXXXXX NOT IN PRODUCTION
+CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]

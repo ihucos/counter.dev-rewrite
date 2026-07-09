@@ -1,7 +1,12 @@
-from lib import HtmlBuilder
+from lib import Element
+
+asdfasdf
 
 
-t = HtmlBuilder("body")
+head = Element("head")
+
+
+t = Element("body")
 with t.header:
     with t.section(klass="navbar"):
         # Feedback modal
