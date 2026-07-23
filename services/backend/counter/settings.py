@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "dj_rest_auth.registration",
     "corsheaders",
     "drf_spectacular",
+    "markdownify.apps.MarkdownifyConfig"
     # Custom apps
     "counter",
     "core",

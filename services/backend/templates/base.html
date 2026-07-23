@@ -22,30 +22,17 @@
     {% block head_extra %}{% endblock %}
   </head>
   <body>
-    {% block notification %}
-    <section class="notification">
-      <div class="content">
-        <span>Stop the war. Show your solidarity with a banner 🇺🇦</span>
-      </div>
-    </section>
-    {% endblock %}
 
-    {% block navbar %}
-    <base-navbar></base-navbar>
-    {% endblock %}
+    {% include "includes/navbar.html" %}
 
     {% block content %}{% endblock %}
 
-    {% block footer %}
-    <base-footer></base-footer>
-    {% endblock %}
+    {% include "includes/footer.html" %}
 
     {% block scripts %}
     <script src="{% static 'js/utils.js' %}"></script>
     <script src="{% static 'components/_base.js' %}"></script>
     <script src="{% static 'components/base/editaccount.js' %}"></script>
-    <script src="{% static 'components/base/navbar.js' %}"></script>
-    <script src="{% static 'components/base/footer.js' %}"></script>
     <script src="{% static 'components/base/pwyw.js' %}"></script>
     <script src="{% static 'components/counter-flash.js' %}"></script>
     {% endblock %}

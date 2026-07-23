@@ -1,0 +1,126 @@
+{% load static %}
+
+<!-- Navbar Section -->
+<section class="navbar">
+
+  <!-- Feedback Modal -->
+  <div id="modal-feedback" style="display: none">
+    <div class="modal-header">
+      <img src="{% static 'img/feedback.svg' %}" width="24" height="24" alt="Feedback" />
+      <h3 class="ml16">Feedback</h3>
+      <a href="#" class="btn-close" rel="modal:close"></a>
+    </div>
+    <div class="modal-content">
+      <form action="/feedback" method="POST">
+        {% csrf_token %}
+        <label class="width-full">How can we make the service better for you?
+          <textarea class="width-full" name="feedback" style="min-height: 200px;"></textarea>
+
+          {% if request.user.is_authenticated and request.user.email %}
+            <input id="feedback-mail" type="hidden" name="contact" value="{{ request.user.email }}" class="width-full" />
+          {% else %}
+            <input id="feedback-mail" type="email" name="contact" placeholder="Mail to receive reply (optional)" class="width-full" />
+          {% endif %}
+        </label>
+        
+        <div class="account-btn-group flex mt24 mb32">
+          <a href="#" class="btn-secondary full mr16" rel="modal:close">Cancel</a>
+          <button type="submit" class="btn-primary full">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="content">
+    <a href="{% url 'index' %}" class="logotype"></a>
+
+    <!-- Desktop Navigation -->
+    <nav class="nav-header">
+      <a href="/help/" class="mr32">Help</a>
+      <a href="/blog" class="mr32">Blog</a>
+      <a href="#modal-feedback" class="mr32" rel="modal:open">Feedback</a>
+      <a href="https://github.com/ihucos/counter.dev" class="github-blue mr16" target="_blank" rel="nofollow"></a>
+
+      {% if request.user.is_authenticated %}
+        <!-- User Menu -->
+        <div class="has-user dropdown">
+          <div class="profile-user fill-username">{{ request.user.username }}</div>
+          <div class="dropdown-content">
+            <a href="{% url 'dashboard' %}">Dashboard</a>
+            <a href="#modal-account" rel="modal:open">Edit account</a>
+            <a href="{% url 'logout' %}">Sign out</a>
+          </div>
+        </div>
+      {% else %}
+        <!-- Guest Menu -->
+        <span class="no-user profile-guest">
+          <a href="/login" class="ml32 mr32">Log in</a>
+          <a href="/signup" class="btn-primary">Sign up</a>
+        </span>
+      {% endif %}
+    </nav>
+
+    <!-- Hamburger (Mobile) -->
+    <div class="hamburger-menu">
+      <input id="hamburger-toggle" type="checkbox" />
+      <label class="hamburger-btn" for="hamburger-toggle"></label>
+      
+      <div class="hamburger-box">
+        <div class="hamburger-content">
+          <img src="{% static 'img/avatar.svg' %}" width="96" height="96" alt="Avatar" />
+          
+          <nav class="nav-header-mob">
+            {% if request.user.is_authenticated %}
+              <!-- Mobile User Links -->
+              <div class="has-user">
+                <div class="mt24 fill-username">{{ request.user.username }}</div>
+                <div class="mt24 mb48">
+                  <a href="#modal-account" class="btn-primary mr16" rel="modal:open" onclick="document.getElementById('hamburger-toggle').checked=false">
+                    Edit account
+                  </a>
+                  <a href="{% url 'logout' %}" class="btn-secondary">Sign out</a>
+                </div>
+              </div>
+            {% else %}
+              <!-- Mobile Guest Links -->
+              <span class="no-user mt48 mb48">
+                <a href="/login" class="btn-primary mr16">Log in</a>
+                <a href="/signup" class="btn-secondary">Sign up</a>
+              </span>
+            {% endif %}
+
+            <a href="/blog" class="mb24">Blog</a>
+            
+            {% if request.user.is_authenticated %}
+              <a href="/dashboard" class="has-user mb24" target="_blank" rel="nofollow">Dashboard</a>
+            {% endif %}
+            
+            <a href="mailto:hey@counter.dev" class="mb24" target="_blank" rel="nofollow">Feedback</a>
+            
+            <span class="mt48">
+              <a href="https://github.com/ihucos/counter.dev" class="github-blue mr24" target="_blank" rel="nofollow"></a>
+              <a href="https://twitter.com/NaiveTeamHQ" class="twitter-blue" target="_blank" rel="nofollow"></a>
+            </span>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Optional JS for modal AJAX handling (replacing simpleForm) -->
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const feedbackForm = document.querySelector("#modal-feedback form");
+    if (feedbackForm && typeof simpleForm === "function") {
+      simpleForm("#modal-feedback form", function(msg) {
+        if (window.$ && $.modal) {
+          $.modal.close();
+        }
+        if (typeof notify === "function") {
+          notify(msg);
+        }
+      });
+    }
+  });
+</script>

@@ -1,0 +1,20 @@
+{% load markdownify %}
+{% extends "base.html" %}
+
+
+{% block content %}
+<section class="page">
+  <div class="content">
+    <div class="page-wrap bg-white shadow-lg radius-lg markdown-body">
+      {%filter markdown%}{% block page_content %}{% endblock %}{%endfilter%}
+    </div>
+    <img
+      class="page-pic"
+      src="{% block image %}{% endblock %}"
+      width="350"
+      height="441"
+      alt=""
+    />
+  </div>
+</section>
+{% endblock %}
