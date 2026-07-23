@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     "dj_rest_auth.registration",
     "corsheaders",
     "drf_spectacular",
-    "markdownify.apps.MarkdownifyConfig"
+    "markdownify.apps.MarkdownifyConfig",
     # Custom apps
     "counter",
     "core",
@@ -142,6 +142,35 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@counter.dev")
 PASSWORD_RESET_URL_BASE = os.environ.get(
     "PASSWORD_RESET_URL_BASE", "https://counter.dev/reset"
 )
+
+MARKDOWNIFY = {
+    "default": {
+        "WHITELIST_TAGS": [
+            "a",
+            "p",
+            "strong",
+            "em",
+            "u",
+            "i",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",  # Added header tags
+            "ul",
+            "ol",
+            "li",
+            "blockquote",
+            "code",
+            "pre",
+        ],
+        "MARKDOWN_EXTENSIONS": [
+            "markdown.extensions.fenced_code",
+            "markdown.extensions.extra",
+        ],
+    }
+}
 
 REST_AUTH = {
     "USER_DETAILS_SERIALIZER": "counter.serializers.CustomUserDetailsSerializer",
