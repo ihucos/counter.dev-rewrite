@@ -38,8 +38,18 @@ npm test                  # add --headed / --debug to watch the browser
 docker compose down       # when done
 ```
 
-The tests cover the landing page, the app pages' redirect behavior, and the
-full sign-up / log-in flow (see `e2e/tests/`).
+The tests cover the landing page, the app pages' redirect behavior, the full
+sign-up / log-in flow (plus account recovery and deletion), and the
+dashboard (see `e2e/tests/`).
+
+The dashboard tests ingest real tracking data by sending HTTP requests to
+the tracker service on :8001 (`POST /track` and `/trackpage`, like the
+external tracking script does) and then assert what the dashboard renders.
+This requires the `tracker` and `sync` compose services to be running (the
+`webServer` config starts them); the browser runs pinned to UTC so the
+"today" bucket matches between tracker and dashboard. Known dashboard gaps
+that block fuller dashboard coverage are documented in
+`docs/design-issues.md`.
 
 Failures leave a trace in `e2e/test-results/` (`npx playwright show-trace
 <path-to-trace.zip>`).

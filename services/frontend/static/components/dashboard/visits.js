@@ -2,9 +2,9 @@ customElements.define(
     tagName(),
     class extends HTMLElement {
         draw(logs) {
-            var entries = Object.entries(logs).sort((a, b) => b[1] - a[1]);
-            var parsedLogs = entries.map((e) => this.parseLogEntry(e[0]));
-            parsedLogs = parsedLogs.filter((n) => n); // filter out null values (parse errors)
+            // The backend sends parsed log entries:
+            // [{date, time, country, referrer, device, platform, ...}, ...]
+            var parsedLogs = logs || [];
             this.innerHTML = `
         <div class="metrics-four-item">
           <div class="metrics-headline">
@@ -25,12 +25,12 @@ customElements.define(
                   .map(
                       (logEntry) => `
                 <div class="hour-item">
-                  <span class="visits-date">${logEntry.date}</span>
-                  <span class="visits-time caption-strong">${logEntry.time}</span>
-                  <img class="visits-ip" title="${logEntry.country}" src="/img/famfamfam_flags/gif/${logEntry.country}.gif" width="16" height="11" alt="${logEntry.country}">
-                  <img class="visits-device" title="${logEntry.device}" src="/img/visits/devices/${(logEntry.device || "").toLowerCase()}.svg"></img>
-                  <img class="visits-platform" title="${logEntry.platform}" src="/img/visits/platforms/${logEntry.platform.toLowerCase()}.svg"></img>
-                  <span class="visits-referrer">${logEntry.referrerHtml}</span>
+                  <span class="visits-date">${escapeHtml(logEntry.date)}</span>
+                  <span class="visits-time caption-strong">${escapeHtml(logEntry.time)}</span>
+                  <img class="visits-ip" title="${escapeHtml(logEntry.country)}" src="/img/famfamfam_flags/gif/${escapeHtml(logEntry.country || "xx")}.gif" width="16" height="11" alt="${escapeHtml(logEntry.country)}">
+                  <img class="visits-device" title="${escapeHtml(logEntry.device)}" src="/img/visits/devices/${escapeHtml((logEntry.device || "unknown").toLowerCase())}.svg"></img>
+                  <img class="visits-platform" title="${escapeHtml(logEntry.platform)}" src="/img/visits/platforms/${escapeHtml((logEntry.platform || "unknown").toLowerCase())}.svg"></img>
+                  <span class="visits-referrer">${this.referrerHtml(logEntry.referrer)}</span>
                 </div>`,
                   )
                   .join("")}
@@ -41,41 +41,16 @@ customElements.define(
         </div>`;
         }
 
-        parseLogEntry(visit) {
-            var match = visit.split(" ");
-            var logDate = match[0].slice(1);
-            var logTime = match[1].slice(0, -4);
-            var logCountry = match[2].toLowerCase();
-            var logReferrer = match[3];
-            var logDevice = match[4];
-            var platform = match[5];
-
-            if (logCountry === "") {
-                logCountry = "xx";
+        referrerHtml(referrer) {
+            if (!referrer) {
+                return "-";
             }
-
-            if (logReferrer === "") {
-                logReferrer = "-";
-            } else {
-                try {
-                    var url = new URL(logReferrer);
-                } catch (err) {
-                    var url = null;
-                }
-                if (url === null) {
-                    logReferrer = "?";
-                } else {
-                    logReferrer = `<a target="_blank" class="visits-referrer black" href="${escapeHtml(logReferrer)}">${url.host}</a>`;
-                }
+            try {
+                var url = new URL(referrer);
+            } catch (err) {
+                return "?";
             }
-            return {
-                date: logDate,
-                time: logTime,
-                country: logCountry,
-                referrerHtml: logReferrer,
-                device: logDevice,
-                platform: platform || "Unknown",
-            };
+            return `<a target="_blank" class="visits-referrer black" href="${escapeHtml(referrer)}">${escapeHtml(url.host)}</a>`;
         }
     },
 );

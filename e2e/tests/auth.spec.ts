@@ -1,22 +1,5 @@
 import { expect, test } from "@playwright/test";
-
-// Usernames must be unique across runs because the backend rejects duplicates.
-const uniqueName = () => `e2e-user-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-async function signUp(page: import("@playwright/test").Page, user: string, password = "hunter2secret") {
-  await page.goto("/welcome.html?sign-up");
-  const form = page.locator("#sign-up form");
-  await form.locator("input[name='user']").fill(user);
-  await form.locator("input[name='password']").fill(password);
-  // The form is submitted via AJAX; wait until the request has actually been
-  // processed (success redirects to setup.html, failure shows a modal).
-  const done = Promise.race([
-    page.waitForURL(/\/setup\.html$/),
-    page.locator("#modal-notify").waitFor(),
-  ]);
-  await form.locator("button[type='submit']").click();
-  await done;
-}
+import { signUp, uniqueName } from "./helpers";
 
 test("signing up lands on the setup page showing the new user", async ({ page }) => {
   const user = uniqueName();
@@ -82,4 +65,29 @@ test("the dashboard requires a session", async ({ page }) => {
   await page.goto("/dashboard.html");
   // push-nouser sends anonymous visitors back to the welcome page.
   await expect(page).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
+});
+
+test("account recovery never reveals whether the account exists", async ({ request }) => {
+  const mail = `e2e-${Date.now()}@example.com`;
+  const res = await request.post("/recover", { form: { user: "no-such-user", mail } });
+  expect(res.status()).toBe(200);
+  await expect(res.text()).resolves.toBe("ok");
+});
+
+test("deleting the account removes it", async ({ page }) => {
+  const user = uniqueName();
+  await signUp(page, user);
+
+  const res = await page.request.post("/delete_user");
+  expect(res.status()).toBe(200);
+
+  // The session is gone with the account.
+  await page.context().clearCookies();
+  await page.goto("/welcome.html");
+  await page.locator(".tabs-menu a[href='#sign-in']").click();
+  const form = page.locator("#sign-in form");
+  await form.locator("input[name='user']").fill(user);
+  await form.locator("input[name='password']").fill("hunter2secret");
+  await form.locator("button[type='submit']").click();
+  await expect(page.locator("#modal-notify")).toContainText("no such user");
 });

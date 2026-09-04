@@ -12,10 +12,19 @@ class Counter extends HTMLElement {
         daterange: "all",
     };
 
+    // Ranges without any data come as {} from the backend; counters expect
+    // at least ref/date maps.
+    normalizeVisits(visits) {
+        visits = visits || {};
+        visits.ref = visits.ref || {};
+        visits.date = visits.date || {};
+        return visits;
+    }
+
     draw(allVisits, curTime, utcoffset) {
-        let count = this.count(allVisits[curTime]);
+        let count = this.count(this.normalizeVisits(allVisits[curTime]));
         let nextCurTime = this.nextTime[curTime];
-        let nextCount = this.count(allVisits[nextCurTime]);
+        let nextCount = this.count(this.normalizeVisits(allVisits[nextCurTime]));
 
         let datesPassedCurTime = Object.keys(dFillDatesToNow(allVisits[curTime].date, utcoffset), utcoffset).length;
         let datesPassedNextTime = Object.keys(dFillDatesToNow(allVisits[nextCurTime].date, utcoffset)).length;

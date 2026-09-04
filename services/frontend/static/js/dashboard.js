@@ -136,6 +136,11 @@ function patchDump(dump) {
 }
 
 function addArchivesToDump(archives, dump) {
+    // The backend does not send archives (yet); keep the dump's own last7 /
+    // last30 buckets in that case instead of crashing on missing data.
+    if (!archives || !archives["-7:-2"] || !archives["-30:-2"]) {
+        return dump;
+    }
     for (const site of Object.keys(dump.sites)) {
         dump.sites[site].visits.last7 = patchArchiveVisit(mergeVisits([dump.sites[site].visits.day, dump.sites[site].visits.yesterday, archives["-7:-2"][site] || {}]));
 
