@@ -22,6 +22,12 @@ def first_dump(response):
 
 
 class TestDump:
+    def test_dump_includes_username(self, client, user):
+        # The frontend navbar fills "Hi <username>!" from dump.user.id.
+        client.force_login(user)
+        resp = client.get("/dump")
+        assert first_dump(resp)["user"]["id"] == user.username
+
     def test_user_sees_own_data(self, client, user, host, counts):
         client.force_login(user)
         resp = client.get("/dump")

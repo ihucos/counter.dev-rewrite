@@ -194,6 +194,7 @@ def _build_dump_payload(utcoffset, user, from_date=None, to_date=None) -> dict[s
 
     return {
         "user": {
+            "id": user.username,
             "uuid": str(user.uuid) if user.uuid else "",
             "prefs": user.prefs or {},
             "timezone": user.timezone,

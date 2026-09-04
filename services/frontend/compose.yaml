@@ -15,6 +15,7 @@ services:
       - ./out/help:/usr/share/nginx/html/help
     depends_on:
       - build
+      - backend
 
   # Generates ./out (blog via pelican, pages/help via yasha) so the site can
   # be served without host-side tooling. Reruns on every `up`.
