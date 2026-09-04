@@ -1,0 +1,33 @@
+services:
+  # Serves the prebuilt site on port 8080 (the gateway's `frontend` upstream).
+  # ./static holds the app pages, ./out the generated blog/pages/help.
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html
+
+      # List individual dirs of ./out here
+      - ./out/blog:/usr/share/nginx/html/blog
+      - ./out/pages:/usr/share/nginx/html/pages
+      - ./out/help:/usr/share/nginx/html/help
+    depends_on:
+      - build
+
+  # Generates ./out (blog via pelican, pages/help via yasha) so the site can
+  # be served without host-side tooling. Reruns on every `up`.
+  build:
+    image: python:3.13-alpine
+    working_dir: /src
+    volumes:
+      - .:/src
+    # ext.py shells out to a `markdown` CLI reading stdin; the Markdown
+    # package only ships `markdown_py`, so provide a tiny stdin wrapper.
+    command: sh -c "apk add --no-cache make >/dev/null \
+      && pip install --no-cache-dir pelican markdown yasha \
+      && printf '%s\\n' '#!/usr/local/bin/python' 'import sys, markdown' \
+         'print(markdown.markdown(sys.stdin.read()))' > /usr/local/bin/markdown \
+      && chmod +x /usr/local/bin/markdown \
+      && make all"
