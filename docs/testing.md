@@ -18,3 +18,31 @@ Notes:
   are isolated from the dev `sync` container.
 - `frontend` and `gateway` compose files work too (`docker compose up` builds
   and serves the site on :8080); they're not needed for the tests.
+
+# E2E tests
+
+Playwright tests in `e2e/tests/` run against the site served by
+`docker compose up` — the frontend nginx on http://localhost:8080. The
+`webServer` config in `e2e/playwright.config.ts` starts the stack
+(`docker compose up --wait frontend`, including the `build` container that
+generates the blog/help pages) when nothing is listening, and reuses a
+running one otherwise.
+
+```sh
+docker compose up -d      # from the repo root (or let the config start it)
+cd e2e
+npm install               # first run only; also run `npx playwright install chromium`
+npm test                  # add --headed / --debug to watch the browser
+docker compose down       # when done
+```
+
+What the tests check (frontend-only, no backend assertions — API calls like
+`/dump` simply 404 against the static nginx):
+
+- The landing page renders with its title and headline.
+- Static files (css/js/img) all resolve — no 404s from the served pages.
+- `dashboard.html`, `setup.html`, and `welcome.html` serve with their titles.
+- Unknown paths return 404.
+
+Failures leave a trace in `e2e/test-results/` (`npx playwright show-trace
+<path-to-trace.zip>`).
