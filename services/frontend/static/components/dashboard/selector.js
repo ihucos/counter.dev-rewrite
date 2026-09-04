@@ -68,7 +68,7 @@ customElements.define(
 
             // request change up in the cloud and then also apply that change down
             // here in the client
-            fetch("/setPrefSite?" + encodeURIComponent(this.site));
+            fetch("/set_pref_site?" + encodeURIComponent(this.site));
             this.dump.user.prefs.site = this.site;
 
             document.dispatchEvent(
@@ -87,7 +87,7 @@ customElements.define(
             // request change up in the cloud and then also apply that change down
             // here in the client
             if (this.range != "daterange") {
-                fetch("/setPrefRange?" + encodeURIComponent(this.range));
+                fetch("/set_pref_range?" + encodeURIComponent(this.range));
             }
             this.dump.user.prefs.range = this.range;
             document.dispatchEvent(

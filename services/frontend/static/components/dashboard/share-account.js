@@ -23,7 +23,7 @@ customElements.define(
                         notify("Not available in demo");
                         return;
                     }
-                    this.post("/deletetoken");
+                    this.post("/delete_token");
                 };
             } else {
                 this.innerHTML = `
@@ -40,7 +40,7 @@ customElements.define(
                         notify("Not available in demo");
                         return;
                     }
-                    this.post("/resettoken");
+                    this.post("/reset_token");
                 };
             }
         }

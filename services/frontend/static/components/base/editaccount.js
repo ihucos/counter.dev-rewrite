@@ -14,7 +14,7 @@ customElements.define(
                   <div class="modal-content">
                     <!-- Time zone -->
                     <div class="title mb16">Time Zone</div>
-                    <form action="/accountedit" id="account-edit" method="POST">
+                    <form action="/account_edit" id="account-edit" method="POST">
                         <select class="width-full" name="utcoffset">
                           ${this.TIMEZONES.map((i) => `<option value="${escapeHtml(i[0])}">${escapeHtml(i[1])}</option>`).join("")}
                         </select>
@@ -91,7 +91,7 @@ customElements.define(
                           </button>
                         </div>
                         <!-- Confirm delete -->
-                        <form action="/deleteUser" class="delete-confirm" method="POST" style="display: none">
+                        <form action="/delete_user" class="delete-confirm" method="POST" style="display: none">
                             <input
                               type="text"
                               class="confirm-input full mr16"

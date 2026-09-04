@@ -42,7 +42,7 @@ customElements.define(
                       </button>
                     </div>
                     <!-- Confirm delete -->
-                    <form class="delete-confirm" action="/deletesite" method="POST" style="display: none" id="site-delete">
+                    <form class="delete-confirm" action="/delete_site" method="POST" style="display: none" id="site-delete">
                       <input
                         name="site"
                         type="hidden"
