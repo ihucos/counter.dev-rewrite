@@ -1,6 +1,4 @@
 from datetime import date, timedelta
-from django.urls import reverse
-from rest_framework import status
 
 from core.models import Count
 
@@ -8,35 +6,30 @@ from core.models import Count
 class TestQueryView:
     """Test query: user cannot see data from a different user"""
 
-    def test_user_can_query_own_data(self, api_client, user, host, counts):
-        api_client.force_authenticate(user=user)
-        url = reverse("query")
-        response = api_client.get(url, {"site": "example.com"})
+    def test_user_can_query_own_data(self, auth_client, user, host, counts):
+        response = auth_client.get("/api/core/query/", {"site": "example.com"})
 
-        assert response.status_code == status.HTTP_200_OK
-        assert "pageview" in response.data
-        assert response.data["pageview"]["/home"] == 13  # 10 + 3 summed
-        assert response.data["pageview"]["/about"] == 5
-        assert response.data["click"]["button1"] == 2
+        assert response.status_code == 200
+        data = response.json()
+        assert "pageview" in data
+        assert data["pageview"]["/home"] == 13  # 10 + 3 summed
+        assert data["pageview"]["/about"] == 5
+        assert data["click"]["button1"] == 2
 
     def test_user_cannot_query_other_users_data(
-        self, api_client, user, host, other_user, other_host, counts
+        self, auth_client, user, host, other_user, other_host, counts
     ):
-        api_client.force_authenticate(user=user)
-        url = reverse("query")
-        response = api_client.get(url, {"site": "other.com"})
+        response = auth_client.get("/api/core/query/", {"site": "other.com"})
 
         # other.com belongs to other_user, not user
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.status_code == 404
 
-    def test_query_with_date_filters(self, api_client, user, host, counts):
-        api_client.force_authenticate(user=user)
+    def test_query_with_date_filters(self, auth_client, user, host, counts):
         today = date.today()
         yesterday = today - timedelta(days=1)
 
-        url = reverse("query")
-        response = api_client.get(
-            url,
+        response = auth_client.get(
+            "/api/core/query/",
             {
                 "site": "example.com",
                 "start_date": today.isoformat(),
@@ -44,54 +37,50 @@ class TestQueryView:
             },
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
+        data = response.json()
         # Only today's data should be included
-        assert "pageview" in response.data
-        assert response.data["pageview"]["/home"] == 10  # Only today's count
-        assert response.data["pageview"]["/about"] == 5
-        assert response.data["click"]["button1"] == 2
+        assert "pageview" in data
+        assert data["pageview"]["/home"] == 10  # Only today's count
+        assert data["pageview"]["/about"] == 5
+        assert data["click"]["button1"] == 2
 
-    def test_query_with_start_date_only(self, api_client, user, host, counts):
-        api_client.force_authenticate(user=user)
+    def test_query_with_start_date_only(self, auth_client, user, host, counts):
         yesterday = date.today() - timedelta(days=1)
 
-        url = reverse("query")
-        response = api_client.get(
-            url,
+        response = auth_client.get(
+            "/api/core/query/",
             {
                 "site": "example.com",
                 "start_date": yesterday.isoformat(),
             },
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
+        data = response.json()
         # Both yesterday and today's data should be included
-        assert response.data["pageview"]["/home"] == 13  # 3 + 10
-        assert response.data["pageview"]["/about"] == 5
-        assert response.data["click"]["button1"] == 2
+        assert data["pageview"]["/home"] == 13  # 3 + 10
+        assert data["pageview"]["/about"] == 5
+        assert data["click"]["button1"] == 2
 
-    def test_query_with_end_date_only(self, api_client, user, host, counts):
-        api_client.force_authenticate(user=user)
+    def test_query_with_end_date_only(self, auth_client, user, host, counts):
         yesterday = date.today() - timedelta(days=1)
 
-        url = reverse("query")
-        response = api_client.get(
-            url,
+        response = auth_client.get(
+            "/api/core/query/",
             {
                 "site": "example.com",
                 "end_date": yesterday.isoformat(),
             },
         )
 
-        assert response.status_code == status.HTTP_200_OK
+        assert response.status_code == 200
+        data = response.json()
         # Only yesterday's data should be included
-        assert "pageview" in response.data
-        assert response.data["pageview"]["/home"] == 3  # Only yesterday
-        assert "/about" not in response.data.get("pageview", {})
+        assert data["pageview"]["/home"] == 3  # Only yesterday
+        assert "/about" not in data.get("pageview", {})
 
-    def test_entries_with_same_category_and_item_summed(self, api_client, user, host):
-        api_client.force_authenticate(user=user)
-
+    def test_entries_with_same_category_and_item_summed(self, auth_client, user, host):
         # Create multiple counts with same category/item on different days
         today = date.today()
         yesterday = today - timedelta(days=1)
@@ -112,22 +101,19 @@ class TestQueryView:
             host=host, date=today, category="pageview", item="/about", total=7
         )
 
-        url = reverse("query")
-        response = api_client.get(url, {"site": "example.com"})
+        response = auth_client.get("/api/core/query/", {"site": "example.com"})
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data["pageview"]["/home"] == 18  # 10 + 5 + 3
-        assert response.data["pageview"]["/about"] == 7
+        assert response.status_code == 200
+        data = response.json()
+        assert data["pageview"]["/home"] == 18  # 10 + 5 + 3
+        assert data["pageview"]["/about"] == 7
 
     def test_unauthenticated_cannot_query(self, api_client):
-        url = reverse("query")
-        response = api_client.get(url, {"site": "example.com"})
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        response = api_client.get("/api/core/query/", {"site": "example.com"})
+        assert response.status_code == 403
 
-    def test_query_returns_empty_for_no_data(self, api_client, user, host):
-        api_client.force_authenticate(user=user)
-        url = reverse("query")
-        response = api_client.get(url, {"site": "example.com"})
+    def test_query_returns_empty_for_no_data(self, auth_client, user, host):
+        response = auth_client.get("/api/core/query/", {"site": "example.com"})
 
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data == {}
+        assert response.status_code == 200
+        assert response.json() == {}

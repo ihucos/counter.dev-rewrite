@@ -13,9 +13,6 @@ def host(h):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
 STATIC_ROOT = "/var/www/example.com/static/"
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-change-me")
@@ -30,15 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
-    "dj_rest_auth",
-    "dj_rest_auth.registration",
     "corsheaders",
-    "drf_spectacular",
     "markdownify.apps.MarkdownifyConfig",
     # Custom apps
     "counter",
@@ -54,7 +43,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "counter.urls"
@@ -105,16 +93,6 @@ TEMPLATES = [
         },
     },
 ]
-
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-}
 
 # API lives at app.counter.dev, accessed from counter.dev
 # In Docker Compose, the frontend nginx proxies /api to backend,
@@ -171,10 +149,3 @@ MARKDOWNIFY = {
         ],
     }
 }
-
-REST_AUTH = {
-    "USER_DETAILS_SERIALIZER": "counter.serializers.CustomUserDetailsSerializer",
-    "REGISTER_SERIALIZER": "counter.serializers.CustomRegisterSerializer",
-}
-
-SITE_ID = 1

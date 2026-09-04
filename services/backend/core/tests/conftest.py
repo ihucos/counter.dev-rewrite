@@ -1,9 +1,9 @@
 import pytest
 from datetime import date, timedelta
-from rest_framework.test import APIClient
 from django.core.cache import cache as django_cache
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import Client
 from redis import Redis
 import re
 
@@ -80,7 +80,13 @@ def clean_cache(redis):
 
 @pytest.fixture
 def api_client():
-    return APIClient()
+    return Client()
+
+
+@pytest.fixture
+def auth_client(api_client, user):
+    api_client.force_login(user)
+    return api_client
 
 
 @pytest.fixture
