@@ -1,18 +1,35 @@
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
 from django.conf import settings
+from django.conf.urls.static import static
+from django.urls import path
+
+from core import views as api
 from . import views
 
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-
 urlpatterns = [
+    # Authentication & account
+    path("login", api.login_view, name="login"),
+    path("register", api.register_view, name="register"),
+    path("recover", api.recover_view, name="recover"),
+    path("account_edit", api.account_edit_view, name="account_edit"),
+    path("delete_user", api.delete_user_view, name="delete_user"),
+    path("feedback", api.feedback_view, name="feedback"),
+    # Sites
+    path("delete_site", api.delete_site_view, name="delete_site"),
+    # Guest / share access
+    path("reset_token", api.reset_token_view, name="reset_token"),
+    path("delete_token", api.delete_token_view, name="delete_token"),
+    # Dashboard preferences
+    path("set_pref_site", api.set_pref_site_view, name="set_pref_site"),
+    path("set_pref_range", api.set_pref_range_view, name="set_pref_range"),
+    # Dashboard data
+    path("dump", api.dump_sse, name="dump"),
+    # Misc
+    path("lang", api.lang_view, name="lang"),
+    path("newsletter_register", api.newsletter_register_view, name="newsletter_register"),
+    path("subscribed", api.subscribed_view, name="subscribed"),
+    # Pages
     path("", views.index, name="index"),
     path("privacy", views.privacy, name="privacy"),
     path("admin/", admin.site.urls),
-    path("api/core/", include("core.urls")),
-    path("api/auth/", include("dj_rest_auth.urls")),
-    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -30,15 +30,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
-    "dj_rest_auth",
-    "dj_rest_auth.registration",
-    "corsheaders",
-    "drf_spectacular",
     "markdownify.apps.MarkdownifyConfig",
     # Custom apps
     "counter",
@@ -46,7 +37,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -54,7 +44,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "counter.urls"
@@ -106,29 +95,9 @@ TEMPLATES = [
     },
 ]
 
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-}
-
-# API lives at app.counter.dev, accessed from counter.dev
-# In Docker Compose, the frontend nginx proxies /api to backend,
-# so the Origin will be http://localhost:3000 (the nginx proxy).
-# Also allow the Docker service name for internal health checks.
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ALLOWED_ORIGINS",
-    "https://counter.dev,http://localhost:3000,http://localhost",
-).split(",")
-CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = os.environ.get(
-    "CSRF_TRUSTED_ORIGINS",
-    "https://counter.dev,https://app.counter.dev,http://localhost:3000",
-).split(",")
+# All endpoints are same-origin relative URLs (see docs/api.md), so no CORS
+# is configured. The API endpoints are CSRF-exempt and rely on the session
+# cookie only.
 
 # When behind the nginx reverse proxy, trust the X-Forwarded-Proto header
 USE_X_FORWARDED_HOST = True
@@ -171,10 +140,3 @@ MARKDOWNIFY = {
         ],
     }
 }
-
-REST_AUTH = {
-    "USER_DETAILS_SERIALIZER": "counter.serializers.CustomUserDetailsSerializer",
-    "REGISTER_SERIALIZER": "counter.serializers.CustomRegisterSerializer",
-}
-
-SITE_ID = 1
