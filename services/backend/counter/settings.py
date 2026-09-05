@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "markdownify.apps.MarkdownifyConfig",
     # Custom apps
     "rest_framework",
+    "drf_spectacular",
     "counter",
     "core",
 ]
@@ -77,6 +78,20 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.AccountAuthentication"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+# Swagger/OpenAPI schema settings. SESSION_AUTH disables the browsable-API
+# session login in the Swagger UI, since the API is JSON-only; the session
+# cookie is still sent by the browser, so "Try it out" works while signed in.
+SPECTACULAR_SETTINGS = {
+    "TITLE": "counter.dev API",
+    "DESCRIPTION": "API for the counter.dev web analytics dashboard.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "withCredentials": True,
+    },
 }
 
 LANGUAGE_CODE = "en-us"

@@ -20,12 +20,18 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 
-from rest_framework import permissions
+from rest_framework import permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotAuthenticated, ValidationError
 from rest_framework.response import Response
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer, Serializer
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiTypes,
+    extend_schema,
+    extend_schema_view,
+)
 
 from .accounts import _sites_for
 from .authentication import AccountAuthentication
@@ -41,6 +47,62 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+class OkResponseSerializer(Serializer):
+    """Generic {"ok": true} response body."""
+
+    ok = serializers.BooleanField()
+
+
+class UserStateSerializer(Serializer):
+    id = serializers.CharField()
+    uuid = serializers.CharField(allow_blank=True)
+    token = serializers.CharField(allow_blank=True)
+    prefs = serializers.JSONField()
+    timezone = serializers.IntegerField()
+
+
+class MeMetaSerializer(Serializer):
+    utcoffset = serializers.IntegerField()
+    sessionless = serializers.BooleanField()
+    demo = serializers.BooleanField()
+
+
+class MeResponseSerializer(Serializer):
+    """Body of the /me response: user record and session meta."""
+
+    user = UserStateSerializer()
+    meta = MeMetaSerializer()
+
+
+class LogEntrySerializer(Serializer):
+    site = serializers.CharField()
+    timestamp = serializers.CharField()
+    date = serializers.CharField()
+    time = serializers.CharField()
+    country = serializers.CharField()
+    referrer = serializers.CharField()
+    device = serializers.CharField()
+    platform = serializers.CharField()
+    extra = serializers.CharField()
+
+
+class QueryResponseSerializer(Serializer):
+    """Body of the /query response: per-category visit aggregates plus the
+    recent-visits log."""
+
+    site = serializers.CharField()
+    start = serializers.DateField()
+    end = serializers.DateField()
+    visits = serializers.DictField(
+        child=serializers.DictField(child=serializers.IntegerField()),
+    )
+    logs = LogEntrySerializer(many=True)
+
+
+class TokenResponseSerializer(Serializer):
+    token = serializers.CharField()
 
 RANGES = ["day", "yesterday", "last7", "last30", "month", "year", "all"]
 
@@ -177,6 +239,7 @@ def _get_user_logs(user, site: Optional[str] = None, limit: int = 50) -> list[di
     return logs[:limit]
 
 
+@extend_schema(request=LoginSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def login_view(request):
@@ -195,6 +258,7 @@ def login_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(responses={302: None}, auth=None)
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def logout_view(request):
@@ -211,6 +275,7 @@ def logout_view(request):
     return redirect(f"{origin or 'https://counter.dev'}/welcome.html")
 
 
+@extend_schema(request=RegisterSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def register_view(request):
@@ -226,6 +291,7 @@ def register_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(request=RecoverSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def recover_view(request):
@@ -247,6 +313,7 @@ def recover_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(request=AccountEditSerializer, responses=OkResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def account_edit_view(request):
@@ -274,6 +341,7 @@ def account_edit_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(request=None, responses=OkResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def delete_user_view(request):
@@ -281,6 +349,7 @@ def delete_user_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(request=FeedbackSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def feedback_view(request):
@@ -299,6 +368,7 @@ def feedback_view(request):
 # --- Sites ---------------------------------------------------------------------
 
 
+@extend_schema(request=None, responses=OkResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def delete_site_view(request):
@@ -315,6 +385,7 @@ def delete_site_view(request):
 # --- Guest / share access --------------------------------------------------------
 
 
+@extend_schema(request=None, responses=TokenResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def reset_token_view(request):
@@ -323,6 +394,7 @@ def reset_token_view(request):
     return Response({"token": request.user.share_token})
 
 
+@extend_schema(request=None, responses=OkResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def delete_token_view(request):
@@ -334,6 +406,11 @@ def delete_token_view(request):
 # --- Dashboard preferences -------------------------------------------------------
 
 
+@extend_schema(
+    # The site name is the raw URL-encoded query string, e.g. /set_pref_site?example.com
+    parameters=[OpenApiParameter(name="site", type=str, location=OpenApiParameter.QUERY, required=False)],
+    responses=OkResponseSerializer,
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def set_pref_site_view(request):
@@ -347,6 +424,10 @@ def set_pref_site_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(
+    parameters=[OpenApiParameter(name="range", type=str, location=OpenApiParameter.QUERY, enum=RANGES)],
+    responses=OkResponseSerializer,
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def set_pref_range_view(request):
@@ -364,6 +445,7 @@ def set_pref_range_view(request):
 # --- Dashboard data ---------------------------------------------------------------
 
 
+@extend_schema(responses=MeResponseSerializer)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def me_view(request):
@@ -373,23 +455,39 @@ def me_view(request):
     share-account panel.
     """
     return Response(
-        {
-            "user": {
-                "id": request.user.username,
-                "uuid": str(request.user.uuid) if request.user.uuid else "",
-                "token": request.user.share_token,
-                "prefs": request.user.prefs or {},
-                "timezone": request.user.timezone,
-            },
-            "meta": {
-                "utcoffset": _utcoffset(request),
-                "sessionless": request.sessionless,
-                "demo": request.demo,
-            },
-        }
+        MeResponseSerializer(
+            {
+                "user": {
+                    "id": request.user.username,
+                    "uuid": str(request.user.uuid) if request.user.uuid else "",
+                    "token": request.user.share_token,
+                    "prefs": request.user.prefs or {},
+                    "timezone": request.user.timezone,
+                },
+                "meta": {
+                    "utcoffset": _utcoffset(request),
+                    "sessionless": request.sessionless,
+                    "demo": request.demo,
+                },
+            }
+        ).data
     )
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(name="site", type=str, location=OpenApiParameter.QUERY, required=True),
+        OpenApiParameter(name="start", type=str, location=OpenApiParameter.QUERY, description="ISO date (YYYY-MM-DD), inclusive; defaults to the beginning of time"),
+        OpenApiParameter(name="end", type=str, location=OpenApiParameter.QUERY, description="ISO date (YYYY-MM-DD), inclusive; defaults to a year ahead of today"),
+        OpenApiParameter(name="utcoffset", type=int, location=OpenApiParameter.QUERY, description="Viewer's UTC offset in whole hours, used for the default end date"),
+        # Guest/share access: instead of a session cookie, a share URL
+        # carries the account uuid plus its share token.
+        OpenApiParameter(name="user", type=str, location=OpenApiParameter.QUERY, description="Account uuid for guest/share access"),
+        OpenApiParameter(name="token", type=str, location=OpenApiParameter.QUERY, description="Share token for guest/share access"),
+        OpenApiParameter(name="demo", type=bool, location=OpenApiParameter.QUERY, description="Read-only demo access to the demo site"),
+    ],
+    responses=QueryResponseSerializer,
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def query_view(request):
@@ -420,19 +518,22 @@ def query_view(request):
     for category in CATEGORIES:
         visits.setdefault(category, {})
     return Response(
-        {
-            "site": site,
-            "start": start.isoformat(),
-            "end": end.isoformat(),
-            "visits": visits,
-            "logs": _get_user_logs(user, site=site, limit=30),
-        }
+        QueryResponseSerializer(
+            {
+                "site": site,
+                "start": start,
+                "end": end,
+                "visits": visits,
+                "logs": _get_user_logs(user, site=site, limit=30),
+            }
+        ).data
     )
 
 
 # --- Misc -------------------------------------------------------------------------
 
 
+@extend_schema(responses=OpenApiTypes.STR, auth=None)
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def lang_view(request):
@@ -451,6 +552,7 @@ def lang_view(request):
     return HttpResponse("EN", content_type="text/plain")
 
 
+@extend_schema(request=NewsletterSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def newsletter_register_view(request):
@@ -460,6 +562,7 @@ def newsletter_register_view(request):
     return Response({"ok": True})
 
 
+@extend_schema(request=SubscribedSerializer, responses=OkResponseSerializer)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def subscribed_view(request):
@@ -484,6 +587,15 @@ class HostSerializer(ModelSerializer):
         fields = ["name", "hide"]
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(name="user", type=str, location=OpenApiParameter.QUERY, description="Account uuid for guest/share access"),
+            OpenApiParameter(name="token", type=str, location=OpenApiParameter.QUERY, description="Share token for guest/share access"),
+            OpenApiParameter(name="demo", type=bool, location=OpenApiParameter.QUERY, description="Read-only demo access to the demo site"),
+        ],
+    ),
+)
 class SiteViewSet(ReadOnlyModelViewSet):
     """List/retrieve only: the sites a user has, in name order.
 

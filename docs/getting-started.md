@@ -36,6 +36,14 @@ docker compose up       # from the repo root; the gateway on :80 is the
 URL tells you how to fix itself. Testing and further details:
 [testing.md](testing.md), [architecture.md](architecture.md).
 
+### Gotcha: code is baked into the images
+
+The containers have no bind mounts, and the compose files' `develop.watch`
+sections only apply while `docker compose watch` is running. A plain `up`
+reuses the stale image: `.py` edits don't apply until you run
+`docker compose watch` or `docker compose up -d --build <service>`, and new
+dependencies, settings, or Dockerfile edits always require a rebuild.
+
 ## Management commands
 
 The backend container runs `manage.py migrate`, `manage.py createdemodata`

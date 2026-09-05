@@ -3,6 +3,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 from rest_framework.routers import SimpleRouter
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 from core import api
 
@@ -34,5 +39,9 @@ urlpatterns = [
     path("newsletter_register", api.newsletter_register_view, name="newsletter_register"),
     path("subscribed", api.subscribed_view, name="subscribed"),
     path("", include(router.urls)),
+    # API documentation
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
+    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

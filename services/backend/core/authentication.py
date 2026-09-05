@@ -1,7 +1,20 @@
 """DRF authentication: session auth extended with guest/share and demo access."""
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 from rest_framework.authentication import SessionAuthentication
 
 from .accounts import _resolve_account
+
+
+class AccountAuthenticationSchema(OpenApiAuthenticationExtension):
+    """Describes AccountAuthentication in the OpenAPI schema as the session
+    cookie it actually resolves (the guest/share and demo fallbacks are
+    documented per-parameter instead)."""
+
+    target_class = "core.authentication.AccountAuthentication"
+    name = "sessionAuth"
+
+    def get_security_definition(self, auto_schema):
+        return {"type": "apiKey", "in": "cookie", "name": "sessionid"}
 
 
 class AccountAuthentication(SessionAuthentication):
