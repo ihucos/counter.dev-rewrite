@@ -2,7 +2,6 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   API_BASE,
   addSite,
-  gotoDashboard,
   readMe,
   signUp,
   trackVisit,
@@ -20,7 +19,7 @@ async function accountWithData(page: Page, visits: number) {
   await signUp(page, user);
   await addSite(page, SITE);
 
-  await gotoDashboard(page);
+  await page.goto("/dashboard.html");
 
   // 5 search-engine visits, 2 from another site, 1 direct visit (no
   // referrer) and 2 pageviews — 10 tracked requests in total, all today.
@@ -70,14 +69,13 @@ test("guest share access shows the dashboard without a session", async ({ page, 
   // An anonymous visitor with the share link sees the same data.
   const guest = await browser.newContext();
   const guestPage = await guest.newPage();
-  await guestPage.goto(`/dashboard.html?user=${uuid}&token=${token}`);
+  await gotoExpectingRedirect(guestPage, `/dashboard.html?user=${uuid}&token=${token}`, /dashboard\.html$/);
   await expect(guestPage.locator("#site-select")).toHaveValue(SITE, { timeout: 15_000 });
   await expect(guestPage.locator("dashboard-counter-visitors dashboard-number")).toHaveText("10");
 
   // A wrong token is rejected like no session at all.
   const intruder = await guest.newPage();
-  await intruder.goto(`/dashboard.html?user=${uuid}&token=wrong-token`);
-  await expect(intruder).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
+  await gotoExpectingRedirect(intruder, `/dashboard.html?user=${uuid}&token=wrong-token`, /welcome\.html$/);
 
   await guest.close();
 });

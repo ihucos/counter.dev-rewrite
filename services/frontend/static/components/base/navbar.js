@@ -15,10 +15,6 @@ customElements.define(
         }
 
         loadUser() {
-            if (!document.cookie.includes("swa=")) {
-                this.noUser();
-            }
-
             // invalidates cache key when cookie changes
             var usernameCacheKey = "navbar-username-cache-" + this.hash(document.cookie);
 
@@ -64,7 +60,9 @@ customElements.define(
         }
 
         noUser() {
+            document.querySelectorAll(".has-user").forEach((el) => (el.style.display = "none"));
             document.querySelectorAll(".no-user").forEach((el) => (el.style.display = "block"));
+            Array.from(document.getElementsByClassName("fill-username")).forEach((el) => (el.innerHTML = ""));
         }
 
         hasUser(user) {
@@ -256,6 +254,22 @@ Let's hope this madness stops eventually and things become more normal.
                </section>
                <base-editaccount></base-editaccount>`;
             this.loadUser();
+            // Sign out as a client-side action: clear the cached identity
+            // before navigating, so the next page render cannot replay it.
+            // The plain href stays as the no-JS fallback.
+            this.querySelectorAll('a[href$="/logout"]').forEach((el) => {
+                el.addEventListener("click", (evt) => {
+                    evt.preventDefault();
+                    var logoutUrl = el.getAttribute("href");
+                    var done = () => {
+                        Object.keys(sessionStorage)
+                            .filter((key) => key.startsWith("navbar-username-cache-"))
+                            .forEach((key) => sessionStorage.removeItem(key));
+                        window.location.href = "/welcome.html";
+                    };
+                    fetch(logoutUrl, { credentials: "include" }).then(done, done);
+                });
+            });
             simpleForm("#modal-feedback form", (msg) => {
                 closeModal();
                 notify(msg);

@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API_BASE, addSite, gotoDashboard, listSites, readMe, signUp, uniqueName } from "./helpers";
+import {
+  API_BASE,
+  addSite,
+  gotoDashboard,
+  gotoExpectingRedirect,
+  listSites,
+  readMe,
+  signUp,
+  uniqueName,
+} from "./helpers";
 
 // Tests for the account-level flows reachable through the UI: sign out,
 // the edit-account modal (settings + sites), deleting a site, feedback,
@@ -24,8 +33,7 @@ test("signing out through the navbar ends the session", async ({ page }) => {
   await expect(page).toHaveURL(/\/welcome\.html$/, { timeout: 15_000 });
 
   // The session is really gone: the dashboard bounces anonymous visitors.
-  await page.goto("/dashboard.html");
-  await expect(page).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
+  await gotoExpectingRedirect(page, "/dashboard.html", /welcome\.html$/);
 });
 
 test("editing the account through the modal saves settings and sites", async ({ page }) => {
@@ -128,8 +136,7 @@ test("revoking the share token locks out guest access", async ({ page, browser }
   // A guest with the now-revoked token is rejected like without any token.
   const guest = await browser.newContext();
   const guestPage = await guest.newPage();
-  await guestPage.goto(`/dashboard.html?user=${uuid}&token=${token}`);
-  await expect(guestPage).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
+  await gotoExpectingRedirect(guestPage, `/dashboard.html?user=${uuid}&token=${token}`, /welcome\.html$/);
   await guest.close();
 });
 

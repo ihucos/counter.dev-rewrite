@@ -131,6 +131,14 @@ export async function gotoDashboard(page: Page) {
   await page.waitForURL(/dashboard\.html$/, { timeout: 15_000 });
 }
 
+// Navigate to a page that may itself redirect (e.g. an anonymous dashboard
+// bounce to welcome.html): the client-side redirect can abort the goto, so
+// swallow that error and wait for the expected URL instead.
+export async function gotoExpectingRedirect(page: Page, url: string, waitFor: RegExp) {
+  await page.goto(url).catch(() => {});
+  await page.waitForURL(waitFor, { timeout: 15_000 });
+}
+
 export function sumVisits(visits: Record<string, number>): number {
   return Object.values(visits).reduce((acc, n) => acc + n, 0);
 }
@@ -154,9 +162,9 @@ export async function queryVisits(
 }
 
 // The "date" category buckets one item per day, so summing it gives the
-// total number of visits in the range.
-export function dayTotals(visits: Record<string, Record<string, number>>): Record<string, number> {
-  return visits?.date ?? {};
+// total number of visits in the range. `visits` is the /query response.
+export function dayTotals(visits: { visits?: Record<string, Record<string, number>> }): Record<string, number> {
+  return visits?.visits?.date ?? {};
 }
 
 // Wait until the ingested visits have made it through Redis and the sync

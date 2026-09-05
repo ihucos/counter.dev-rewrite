@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoExpectingRedirect } from "./helpers";
 
 test("/welcome.html serves with the right title", async ({ page }) => {
   const response = await page.goto("/welcome.html");
@@ -7,8 +8,9 @@ test("/welcome.html serves with the right title", async ({ page }) => {
 });
 
 test("setup redirects anonymous visitors to the landing page", async ({ page }) => {
-  await page.goto("/setup.html");
-  await expect(page).toHaveURL(/index\.html$/);
+  // The 401 boot answer redirects to the landing page; the client-side
+  // redirect can abort the goto, so tolerate that.
+  await gotoExpectingRedirect(page, "/setup.html", /index\.html$/);
 });
 
 test("unknown paths 404", async ({ request }) => {

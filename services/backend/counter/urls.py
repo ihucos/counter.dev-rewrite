@@ -5,7 +5,6 @@ from django.urls import path
 
 from core import api
 from core import views as api_views
-from . import views
 
 urlpatterns = [
     # Authentication & account
@@ -33,8 +32,5 @@ urlpatterns = [
     path("lang", api.lang_view, name="lang"),
     path("newsletter_register", api.newsletter_register_view, name="newsletter_register"),
     path("subscribed", api.subscribed_view, name="subscribed"),
-    # Pages
-    path("", views.index, name="index"),
-    path("privacy", views.privacy, name="privacy"),
     path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -63,6 +63,8 @@ customElements.define(
         }
 
         drawPlans(userDump) {
+            var self = this; // used by the closures below (the bare `self`
+            // global would be the window and has no querySelector)
             this.innerHTML += `
                <div id="modal-pwyw" style="display: none">
 				   <div class="modal-header">

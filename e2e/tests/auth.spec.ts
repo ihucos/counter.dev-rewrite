@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { API_BASE, signUp, uniqueName } from "./helpers";
+import { API_BASE, gotoExpectingRedirect, signUp, uniqueName } from "./helpers";
 
 test("signing up lands on the setup page showing the new user", async ({ page }) => {
   const user = uniqueName();
@@ -75,18 +75,23 @@ test("the navbar hides Log in/Sign up for logged-in users", async ({ page }) => 
   }
   await expect(page.locator(".has-user.dropdown")).toBeVisible();
 
-  // After signing out, the guest links come back. /logout is a GET link in
-  // the navbar and redirects, so navigate like the real sign-out link does.
-  await page.goto(`${API_BASE}/logout`, { waitUntil: "commit" });
-  await page.reload();
+  // After clicking the navbar's Sign out link, the guest links come back
+  // and no username is left in the navbar (the client-side sign-out clears
+  // the sessionStorage username cache before navigating). The dropdown is
+  // hover-only, so open it before clicking.
+  const dropdown = page.locator(".has-user.dropdown");
+  await dropdown.hover();
+  await dropdown.locator('a[href$="/logout"]').click();
+  await expect(page).toHaveURL(/\/welcome\.html$/, { timeout: 15_000 });
   await expect(page.locator(".no-user.profile-guest")).toBeVisible();
   await expect(page.locator(".has-user.dropdown")).toBeHidden();
+  await expect(page.locator(".fill-username").first()).toHaveText("");
 });
 
 test("the dashboard requires a session", async ({ page }) => {
-  await page.goto("/dashboard.html");
-  // push-nouser sends anonymous visitors back to the welcome page.
-  await expect(page).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
+  // The 401 boot answer sends anonymous visitors back to the welcome page;
+  // the client-side redirect can abort the goto, so tolerate that.
+  await gotoExpectingRedirect(page, "/dashboard.html", /welcome\.html$/);
 });
 
 test("account recovery never reveals whether the account exists", async ({ request }) => {
