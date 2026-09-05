@@ -14,13 +14,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" type="text/css" href="css/landing.css" />
     <link rel="stylesheet" type="text/css" href="css/pwyw.css" />
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css" />
+    <link rel="stylesheet" type="text/css" href="css/modal.css" />
     <link rel="shortcut icon" href="img/favicon.png" />
     <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js"></script>
     <script src="js/utils.js"></script>
     <script src="components/_base.js"></script>
     <script src="components/base/editaccount.js"></script>
@@ -100,7 +96,7 @@
     <!-- Features -->
     <section class="features">
       <div class="content">
-        <div class="owl-carousel owl-theme">
+        <div class="features-slider">
           <!-- Counts daily unique visitors -->
           <div class="features-item radius-sm">
             <div class="features-item-pic">
@@ -161,20 +157,6 @@
     </section>
     <base-pwyw></base-pwyw>
     <base-footer></base-footer>
-    <script type="text/javascript">
-      $(document).ready(function () {
-        // depltest
-        // Features slider
-        $(".owl-carousel").owlCarousel({
-          items: 1,
-          margin: 30,
-          nav: false,
-          responsive: {
-            1110: { items: 4, margin: 30, mouseDrag: false, nav: false },
-          },
-        });
-      });
-    </script>
     <!-- this is a test comment -->
   </body>
 </html>

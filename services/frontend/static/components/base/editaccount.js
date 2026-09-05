@@ -126,9 +126,9 @@ customElements.define(
 
             let showHidePrefferedSites = function () {
                 if (useSitesEl.value === "") {
-                    $(sitesEl.parentElement).slideUp();
+                    slideHide(sitesEl.parentElement);
                 } else {
-                    $(sitesEl.parentElement).slideDown();
+                    slideShow(sitesEl.parentElement);
                 }
             };
             showHidePrefferedSites();
@@ -139,13 +139,17 @@ customElements.define(
             this.querySelector(".delete-request button").onclick = () => {
                 deleteRequest.style.display = "none";
                 deleteConfirm.style.display = "flex";
+                var danger = this.querySelector(".danger");
+                danger.classList.toggle("gradient-red");
+                danger.classList.toggle("bg-blue");
+                this.querySelector(".confirm-input").focus();
             };
 
             simpleForm("#account-edit", window.location.href.split("#")[0]);
             simpleForm(".delete-account .delete-confirm", "/");
 
             // redraw modal if it is closed
-            $("#modal-account", this).on($.modal.AFTER_CLOSE, (event, modal) => {
+            this.querySelector("#modal-account").addEventListener("modal-after-close", () => {
                 this.draw(prefs);
             });
         }

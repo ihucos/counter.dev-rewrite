@@ -73,17 +73,19 @@ customElements.define(
                 };
                 document.dispatchEvent(new CustomEvent("selector-daterange-fetched", { detail: detail }));
                 this.closeSuccess = true;
-                $.modal.close();
+                closeModal();
             };
 
             document.addEventListener("selector-daterange-fetch", (evt) => {
                 this.popup();
             });
 
-            $(this).on($.modal.AFTER_CLOSE, (event, modal) => {
+            this.addEventListener("modal-after-close", () => {
                 if (!this.closeSuccess) {
                     // select anything that is not the invalid "daterangesel" val
-                    $("#range-select").val("all").change();
+                    var rangeSelect = document.getElementById("range-select");
+                    rangeSelect.value = "all";
+                    rangeSelect.dispatchEvent(new Event("change"));
                 }
                 this.closeSuccess = false;
             });
@@ -94,7 +96,7 @@ customElements.define(
             this.querySelector('form button[type="submit"]').setAttribute("disabled", "disabled");
             this.picker.clear();
 
-            $(this).modal();
+            openModal(this);
         }
     },
 );

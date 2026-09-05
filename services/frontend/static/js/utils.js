@@ -27,12 +27,73 @@ function apiUrl(url) {
 // Modal openers are bound delegated at document level: most rel="modal:open"
 // links live inside components injected after page load (navbar, settings),
 // which a ready-time binding never reaches.
-$(document).on("click", 'a[rel="modal:open"]', function (event) {
-    $(this).modal({
-        fadeDuration: 200,
-        fadeDelay: 0,
+document.addEventListener("click", function (event) {
+    var opener = event.target.closest('a[rel="modal:open"]');
+    if (opener) {
+        event.preventDefault();
+        var target = document.querySelector(opener.getAttribute("href"));
+        if (target) openModal(target);
+    }
+    var closer = event.target.closest('a[rel="modal:close"]');
+    if (closer) {
+        event.preventDefault();
+        closeModal();
+    }
+});
+
+// Minimal modal system replacing jquery-modal. A modal element (any element,
+// usually a hidden div) is shown centered over a full-screen blocker.
+// Events dispatched on the modal element:
+//   "modal-before-close", "modal-after-close" (bubbles, so parents can listen)
+var openModalStack = [];
+var modalZIndex = 998;
+
+function openModal(el, opts) {
+    opts = opts || {};
+    if (opts.closeExisting !== false) {
+        closeModal();
+    }
+    var blocker = document.createElement("div");
+    blocker.className = "modal-blocker";
+    blocker.style.zIndex = ++modalZIndex;
+    document.body.appendChild(blocker);
+    el.classList.add("modal");
+    el.style.display = "block";
+    el.style.zIndex = ++modalZIndex;
+    document.body.classList.add("modal-open");
+    openModalStack.push({ el: el, blocker: blocker, opts: opts });
+    // fade in
+    el.style.opacity = "0";
+    blocker.style.opacity = "0";
+    requestAnimationFrame(function () {
+        el.style.opacity = "1";
+        blocker.style.opacity = "1";
     });
-    return false;
+}
+
+function closeModal() {
+    var entry = openModalStack.pop();
+    if (!entry) {
+        return;
+    }
+    entry.el.dispatchEvent(new CustomEvent("modal-before-close", { bubbles: true }));
+    entry.blocker.remove();
+    entry.el.classList.remove("modal");
+    entry.el.style.display = "none";
+    entry.el.style.zIndex = "";
+    if (openModalStack.length === 0) {
+        document.body.classList.remove("modal-open");
+    }
+    entry.el.dispatchEvent(new CustomEvent("modal-after-close", { bubbles: true }));
+}
+
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && openModalStack.length > 0) {
+        var entry = openModalStack[openModalStack.length - 1];
+        if (entry.opts.escapeClose !== false) {
+            closeModal();
+        }
+    }
 });
 
 function simpleForm(formSelector, arg) {
@@ -52,15 +113,18 @@ function simpleForm(formSelector, arg) {
 
     formEl.onsubmit = (evt) => {
         var el = evt.target;
-        $.ajax({
-            type: el.getAttribute("method") || "POST",
-            url: apiUrl(el.getAttribute("action")),
-            data: $(el).serialize(),
-            xhrFields: { withCredentials: true },
-            success: success,
-            error: function (request, status, error) {
-                notify(request.responseText);
-            },
+        var body = new URLSearchParams(new FormData(el)).toString();
+        fetch(apiUrl(el.getAttribute("action")), {
+            method: el.getAttribute("method") || "POST",
+            body: body,
+            credentials: "include",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        }).then(async function (resp) {
+            if (!resp.ok) {
+                notify(await resp.text());
+            } else {
+                success(await resp.text());
+            }
         });
         return false;
     };
@@ -93,7 +157,7 @@ function apiGetJSON(path) {
 }
 
 function notify(msg, cb) {
-    $("#modal-notify").remove();
+    document.querySelector("#modal-notify")?.remove();
     var html = `<div id="modal-notify" style="displaty: none;">
       <div class="modal-header">
         <a href="#" class="btn-close" rel="modal:close"></a>
@@ -107,13 +171,73 @@ function notify(msg, cb) {
         </div>
       </div>
     </div>`;
-    $("body").append($(html));
-    $("#modal-notify").modal({ closeExisting: false });
+    document.body.insertAdjacentHTML("beforeend", html);
+    openModal(document.querySelector("#modal-notify"), { closeExisting: false });
 }
 
 function whenReady(tag, cb) {
     customElements.whenDefined(tag).then(() => {
         var el = document.querySelector(tag);
         cb(el);
+    });
+}
+
+// Slide helpers replacing jQuery slideUp/slideDown.
+function slideHide(el) {
+    el.style.display = "none";
+}
+
+function slideShow(el) {
+    el.style.display = "";
+}
+
+// Minimal tabs implementation replacing jquery.tabslet. Works on a container
+// (e.g. .tabs or .responsive-tabs) holding a ul.tabs-menu / ul.responsive-tabs-menu
+// whose links point at content element ids. destroy() shows all contents again.
+function initTabs(container, opts) {
+    opts = opts || {};
+    if (container.dataset.tabsInit) {
+        return;
+    }
+    container.dataset.tabsInit = "1";
+    var menu = container.querySelector(".tabs-menu, .responsive-tabs-menu");
+    var links = menu.querySelectorAll("a");
+    var contents = [];
+    links.forEach(function (link) {
+        var content = container.querySelector(link.getAttribute("href"));
+        if (content) contents.push(content);
+    });
+    function activate(link) {
+        links.forEach(function (l) {
+            l.parentElement.classList.toggle("active", l === link);
+        });
+        contents.forEach(function (c) {
+            c.style.display = c.id === link.getAttribute("href").slice(1) ? "" : "none";
+        });
+    }
+    menu.addEventListener("click", function (event) {
+        var link = event.target.closest("a");
+        if (!link || !container.querySelector(link.getAttribute("href"))) {
+            return;
+        }
+        event.preventDefault();
+        activate(link);
+    });
+    var activeIndex = opts.active ? opts.active - 1 : 0;
+    activate(links[activeIndex]);
+}
+
+function destroyTabs(container) {
+    if (!container.dataset.tabsInit) {
+        return;
+    }
+    delete container.dataset.tabsInit;
+    var menu = container.querySelector(".tabs-menu, .responsive-tabs-menu");
+    menu.querySelectorAll("li").forEach(function (li) {
+        li.classList.remove("active");
+    });
+    container.querySelectorAll(".tabs-menu a, .responsive-tabs-menu a").forEach(function (link) {
+        var content = container.querySelector(link.getAttribute("href"));
+        if (content) content.style.display = "";
     });
 }

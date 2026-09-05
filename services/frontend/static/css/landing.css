@@ -112,6 +112,33 @@
 .features {
   margin-bottom: 64px;
 }
+
+/* Features slider (replaces OwlCarousel): one card per view on mobile,
+   a static four-column row from 1110px up. */
+.features-slider {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.features-slider::-webkit-scrollbar {
+  display: none;
+}
+.features-slider .features-item {
+  flex: 0 0 100%;
+  width: auto;
+  scroll-snap-align: start;
+}
+@media (min-width: 1110px) {
+  .features-slider {
+    overflow-x: visible;
+  }
+  .features-slider .features-item {
+    flex: 1 1 0;
+  }
+}
+
 .features-item {
   width: 255px;
 }

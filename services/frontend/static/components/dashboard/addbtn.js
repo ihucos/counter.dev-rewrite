@@ -3,7 +3,7 @@ customElements.define(
     class extends HTMLElement {
         draw(sessionless) {
             if (sessionless) {
-                $(this).css("margin", "0");
+                this.style.margin = "0";
                 return;
             }
 

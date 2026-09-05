@@ -134,23 +134,30 @@ customElements.define(
             this.setupPayPalButton(90, userDump.user.id);
             this.setupPayPalButton(120, userDump.user.id);
 
-            $("input[type=radio][name=plan]").change(function () {
-                $(".paypal-btn").hide();
-                $("#paypal-btn-" + this.value).css("display", "block");
+            this.querySelectorAll("input[type=radio][name=plan]").forEach(function (radio) {
+                radio.addEventListener("change", function () {
+                    self.querySelectorAll(".paypal-btn").forEach(function (btn) {
+                        btn.style.display = "none";
+                    });
+                    document.querySelector("#paypal-btn-" + this.value).style.display = "block";
+                });
             });
 
             // js hack for css stuff
             window.setInterval(function () {
-                let height = $("#modal-pwyw").height();
-                $("#modal-pwyw").css("min-height", height + "px");
+                let height = self.querySelector("#modal-pwyw").offsetHeight;
+                self.querySelector("#modal-pwyw").style.minHeight = height + "px";
             }, 700);
         }
 
         setupPayPalButton(qty, username) {
             var self = this; // important for payment flow
-            $(".paypal-btn-wrapper").append(`
+            this.querySelector(".paypal-btn-wrapper").insertAdjacentHTML(
+                "beforeend",
+                `
                     <div id="paypal-btn-${qty}" class="paypal-btn" style="margin: 0px auto; display: none"></div>
-                `);
+                `,
+            );
 
             paypal
                 .Buttons({
@@ -176,16 +183,19 @@ customElements.define(
         }
 
         modal() {
-            $("#modal-pwyw").modal({
+            openModal(this.querySelector("#modal-pwyw"), {
                 escapeClose: false,
                 clickClose: false,
-                showClose: false,
             });
         }
 
         subscriptionSuccess(subscriptionID) {
-            $.ajax({ type: "POST", url: apiUrl("/subscribed"), data: { subscription_id: subscriptionID }, xhrFields: { withCredentials: true } });
-            $.modal.close();
+            fetch(apiUrl("/subscribed"), {
+                method: "POST",
+                body: new URLSearchParams({ subscription_id: subscriptionID }),
+                credentials: "include",
+            });
+            closeModal();
             notify(`You are awesome. If you are not happy with the product or service let us know at any time.`);
         }
 
@@ -240,8 +250,9 @@ customElements.define(
             this.querySelectorAll(".highlightable")[suggestionTier].classList.add("highlight");
             this.querySelector("#modal-pwyw .highlight + div input").setAttribute("checked", "checked");
 
-            let val = $("input[type=radio][name=plan]:checked").val();
-            $("#paypal-btn-" + val).css("display", "block");
+            let checkedPlan = this.querySelector("input[type=radio][name=plan]:checked");
+            let val = checkedPlan ? checkedPlan.value : "3";
+            document.querySelector("#paypal-btn-" + val).style.display = "block";
         }
     },
 );

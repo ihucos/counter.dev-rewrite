@@ -115,23 +115,25 @@ Let's hope this madness stops eventually and things become more normal.
 
                            </div>`;
 
-                        $("<table id='overlay'><tbody><tr><td>" + text + "</td></tr></tbody></table>")
-                            .css({
-                                position: "fixed",
-                                top: 0,
-                                left: 0,
-                                width: "100%",
-                                height: "100%",
-                                "background-color": "rgba(0,0,0,.9)",
-                                "z-index": 10000,
-                                "vertical-align": "middle",
-                                "text-align": "left",
-                                color: "#fff",
-                                "font-size": "30px",
-                                "font-weight": "bold",
-                                cursor: "wait",
-                            })
-                            .appendTo("body");
+                        var overlay = document.createElement("table");
+                        overlay.id = "overlay";
+                        overlay.innerHTML = "<tbody><tr><td>" + text + "</td></tr></tbody>";
+                        Object.assign(overlay.style, {
+                            position: "fixed",
+                            top: "0",
+                            left: "0",
+                            width: "100%",
+                            height: "100%",
+                            backgroundColor: "rgba(0,0,0,.9)",
+                            zIndex: "10000",
+                            verticalAlign: "middle",
+                            textAlign: "left",
+                            color: "#fff",
+                            fontSize: "30px",
+                            fontWeight: "bold",
+                            cursor: "wait",
+                        });
+                        document.body.appendChild(overlay);
                     }
                 })
                 .catch((err) => console.log(err));
@@ -255,7 +257,7 @@ Let's hope this madness stops eventually and things become more normal.
                <base-editaccount></base-editaccount>`;
             this.loadUser();
             simpleForm("#modal-feedback form", (msg) => {
-                $.modal.close();
+                closeModal();
                 notify(msg);
             });
         }

@@ -643,14 +643,10 @@ select::-ms-expand {
 .modal {
   box-shadow: none !important;
   border-radius: 16px !important;
-  width: 100% !important;
   padding: 0 !important;
 }
-.blocker {
+.modal-blocker {
   background: rgba(0, 0, 0, 0.64) !important;
-}
-.close-modal {
-  display: none !important;
 }
 .modal-content {
   padding: 24px;

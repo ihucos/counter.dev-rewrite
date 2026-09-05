@@ -320,10 +320,10 @@ customElements.define(
                 </div>
                 ${this.drawModals()}`;
 
-            // HOTFIX: This component gets loaded after enabling tabslet for all
+            // HOTFIX: This component gets loaded after enabling tabs for all
             // other elements
             if (window.matchMedia("(max-width: 1110px)").matches) {
-                $(".responsive-tabs", this).tabslet();
+                initTabs(this.querySelector(".responsive-tabs"));
             }
         }
 

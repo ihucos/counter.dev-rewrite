@@ -3,7 +3,7 @@ customElements.define(
     class extends HTMLElement {
         draw(opts) {
             if (opts.meta.sessionless) {
-                $(this).css("margin", "0");
+                this.style.margin = "0";
                 return;
             }
 
@@ -62,18 +62,18 @@ customElements.define(
 
             // Act via closest() so the handler keeps working on whichever modal copy
             // is on screen, even after the component redraws itself.
-            $(this).find(".btn-confirm").click(function () {
-                var danger = $(this).closest(".danger");
-                danger.find(".delete-request").hide();
-                danger.find(".delete-confirm").show();
-                danger.toggleClass("gradient-red bg-blue");
-                danger.find(".confirm-input").focus();
-            });
+            this.querySelector(".btn-confirm").onclick = () => {
+                var danger = this.querySelector(".danger");
+                danger.querySelector(".delete-request").style.display = "none";
+                danger.querySelector(".delete-confirm").style.display = "flex";
+                danger.classList.toggle("gradient-red");
+                danger.classList.toggle("bg-blue");
+                danger.querySelector(".confirm-input").focus();
+            };
 
             // redraw modal if it is closed
-            var parentThis = this;
-            $("#modal-settings", this).on($.modal.AFTER_CLOSE, function (event, modal) {
-                parentThis.draw(opts);
+            this.querySelector("#modal-settings").addEventListener("modal-after-close", () => {
+                this.draw(opts);
             });
 
             simpleForm(this.querySelector("#site-delete"), "/dashboard.html");

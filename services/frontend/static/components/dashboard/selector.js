@@ -101,9 +101,16 @@ customElements.define(
             } else {
                 var tofrom = from.format("DD MMM") + " - " + to.format("DD MMM");
             }
-            let origArchiveTxt = $('#range-select option[value="daterangeset"]').text();
-            $('#range-select option[value="daterange"]').remove();
-            $('#range-select option[value="daterangeset"]').val("daterange").text(tofrom).after($("<option/>").attr("value", "daterangeset").text(origArchiveTxt));
+            let rangeSelect = document.getElementById("range-select");
+            let daterangesetOption = rangeSelect.querySelector('option[value="daterangeset"]');
+            let origArchiveTxt = daterangesetOption.textContent;
+            rangeSelect.querySelector('option[value="daterange"]')?.remove();
+            daterangesetOption.value = "daterange";
+            daterangesetOption.textContent = tofrom;
+            let newOption = document.createElement("option");
+            newOption.value = "daterangeset";
+            newOption.textContent = origArchiveTxt;
+            daterangesetOption.after(newOption);
         }
     },
 );

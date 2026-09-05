@@ -1,0 +1,32 @@
+/* Vanilla replacement for jquery.modal.min.css. See js/utils.js openModal(). */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-blocker {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 10px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.4);
+  transition: opacity 0.2s;
+}
+
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  background: #fff;
+  transition: opacity 0.2s;
+}
+
+@media (min-width: 768px) {
+  .modal {
+    width: 600px;
+  }
+}

@@ -8,13 +8,10 @@
     <link rel="stylesheet" type="text/css" href="css/dashboard.css" />
     <link rel="stylesheet" type="text/css" href="css/pwyw.css" />
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/simplebar/5.3.0/simplebar.min.css" />
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.css" />
     <link rel="shortcut icon" href="img/favicon.png" />
     <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&family=Poppins:wght@700&display=swap" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tabslet.js/1.7.3/jquery.tabslet.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/modal.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simplebar/5.3.0/simplebar.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.2/jquery.modal.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
@@ -350,32 +347,22 @@
     </div>
 
     <script type="text/javascript">
-      $(document).ready(function () {
-        // Responsive tabs
-        checkPosition();
-        // Tabs
-        $(".tabs").tabslet();
-        // Modal openers are bound in utils.js, delegated so they also reach
-        // links inside dynamically injected components.
+      // Responsive tabs
+      checkPosition();
+      // Tabs
+      initTabs(document.querySelector(".tabs"));
+      // Modal openers are bound in utils.js, delegated so they also reach
+      // links inside dynamically injected components.
 
-        // Confirm deletion
-        $(".btn-confirm").click(function () {
-          $(".delete-request").hide();
-          $(".delete-confirm").show();
-          $(".danger").toggleClass("gradient-red bg-blue");
-          $(".confirm-input").focus();
-        });
-      });
-      $(window).resize(function () {
-        // Responsive tabs
+      window.addEventListener("resize", function () {
         checkPosition();
       });
       // Responsive tabs
       function checkPosition() {
         if (window.matchMedia("(max-width: 1110px)").matches) {
-          $(".responsive-tabs").tabslet();
+          initTabs(document.querySelector(".responsive-tabs"));
         } else {
-          $(".responsive-tabs").trigger("destroy");
+          destroyTabs(document.querySelector(".responsive-tabs"));
         }
       }
     </script>

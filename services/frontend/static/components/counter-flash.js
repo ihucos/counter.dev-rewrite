@@ -13,10 +13,10 @@ customElements.define(
                      </div>
                    </section>`;
 
-                $(".btn-close").click(() => {
+                this.querySelector(".btn-close").onclick = () => {
                     this.remove();
                     localStorage.setItem(this.KEY, "yes");
-                });
+                };
             }
         }
     },
