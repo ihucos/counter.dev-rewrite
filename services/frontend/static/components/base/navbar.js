@@ -47,7 +47,7 @@ customElements.define(
 
                 document.dispatchEvent(new CustomEvent("userloaded"));
             });
-            apiGetJSON("/me").then(
+            apiGetJSON("/account").then(
                 (me) => {
                     if (me === null) {
                         document.dispatchEvent(new Event("push-navbar-nouser"));

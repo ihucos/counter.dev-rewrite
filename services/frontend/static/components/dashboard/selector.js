@@ -64,7 +64,7 @@ customElements.define(
 
             // request change up in the cloud and then also apply that change down
             // here in the client
-            fetch(apiUrl("/set_pref_site?") + encodeURIComponent(this.site), { credentials: "include" });
+            this.putPrefs({ site: this.site });
             this.dump.user.prefs.site = this.site;
 
             document.dispatchEvent(new Event("dashboard-state-changed"));
@@ -79,10 +79,20 @@ customElements.define(
             // request change up in the cloud and then also apply that change down
             // here in the client
             if (this.range != "daterange") {
-                fetch(apiUrl("/set_pref_range?") + encodeURIComponent(this.range), { credentials: "include" });
+                this.putPrefs({ range: this.range });
             }
             this.dump.user.prefs.range = this.range;
             document.dispatchEvent(new Event("dashboard-state-changed"));
+        }
+
+        // Persist dashboard prefs (selected site / date range) on the account.
+        putPrefs(prefs) {
+            fetch(apiUrl("/account"), {
+                method: "PUT",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(prefs),
+            });
         }
 
         get site() {

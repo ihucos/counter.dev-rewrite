@@ -45,7 +45,7 @@ class TestRegisterView:
 
     def test_register_logs_user_in(self, client):
         client.post("/register", {"user": "newuser", "password": "pw123456"})
-        resp = client.post("/reset_token")
+        resp = client.put("/account/share_token")
         assert resp.status_code == 200  # authenticated endpoints now work
 
     def test_register_missing_fields(self, client):
@@ -83,13 +83,13 @@ class TestRecoverView:
         assert client.post("/recover", {"mail": "me@example.com"}).status_code == 400
 
 
-class TestDeleteUserView:
+class TestDeleteAccount:
     def test_requires_auth(self, client):
-        assert client.post("/delete_user").status_code == 401
+        assert client.delete("/account").status_code == 401
 
     def test_deletes_account_and_hosts(self, client, user, host):
         client.force_login(user)
-        assert client.post("/delete_user").status_code == 200
+        assert client.delete("/account").status_code == 200
         assert not Host.objects.filter(pk=host.pk).exists()
 
 
@@ -114,7 +114,7 @@ class TestLogoutView:
         resp = client.get("/logout", HTTP_REFERER="http://counterdev.test/dashboard.html")
         assert resp.status_code == 302
         assert resp["Location"] == "http://counterdev.test/welcome.html"
-        resp = client.post("/reset_token")
+        resp = client.put("/account/share_token")
         assert resp.status_code == 401  # session is gone
 
     def test_logout_without_referer_falls_back_to_production(self, client, user):

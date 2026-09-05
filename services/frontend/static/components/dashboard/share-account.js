@@ -24,7 +24,7 @@ customElements.define(
                         notify("Not available in demo");
                         return;
                     }
-                    this.post("/delete_token");
+                    this.request("DELETE", "/account/share_token");
                 };
             } else {
                 this.innerHTML = `
@@ -41,14 +41,14 @@ customElements.define(
                         notify("Not available in demo");
                         return;
                     }
-                    this.post("/reset_token");
+                    this.request("PUT", "/account/share_token");
                 };
             }
         }
 
-        post(url) {
+        request(method, url) {
             this.innerHTML = `<span class="gray ml8 mr16 postponed-visibility">Still loading (error?)...</span>`;
-            fetch(apiUrl(url), { method: "post", credentials: "include" });
+            fetch(apiUrl(url), { method, credentials: "include" });
         }
     },
 );

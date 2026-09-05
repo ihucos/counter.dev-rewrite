@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Proposal: consolidate the API into resource CRUD</title>
+<style>
+  body { max-width: 46rem; margin: 3rem auto; padding: 0 1.5rem;
+         font: 16px/1.6 -apple-system, "Helvetica Neue", sans-serif; color: #1a1a1a; }
+  h1 { font-size: 1.5rem; margin-bottom: 0; }
+  h2 { font-size: 1.1rem; margin-top: 2.5rem; border-bottom: 1px solid #e5e5e5; padding-bottom: .3rem; }
+  p.meta { color: #777; margin-top: .3rem; }
+  code { background: #f4f4f4; padding: .1rem .35rem; border-radius: 4px; font-size: .9em; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: .92rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: #777; }
+  .method { font-weight: 600; white-space: nowrap; }
+  .m-get { color: #2563eb; } .m-post { color: #16a34a; } .m-put { color: #ca8a04; } .m-del { color: #dc2626; }
+  ul { padding-left: 1.2rem; }
+  li { margin: .25rem 0; }
+  .del { color: #999; text-decoration: line-through; }
+  footer { margin-top: 3rem; color: #999; font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<h1>Proposal: consolidate the API into resource CRUD</h1>
+<p class="meta">Backend rewrite · status: proposal</p>
+
+<p>The API is 20 flat <code>@api_view</code> functions that all encode the same
+few resources as verb-named endpoints. Grouping them into two DRF
+<code>ViewSet</code>s on one router removes most of the hand-rolled plumbing,
+gives list/create/update/delete for free from the router, and lets the Swagger
+schema fall out of the serializers automatically.</p>
+
+<h2>Current → proposed</h2>
+
+<table>
+  <tr><th>Resource</th><th>Today</th><th>Proposed</th></tr>
+  <tr>
+    <td>Account</td>
+    <td><span class="method m-put">POST</span> <code>/account_edit</code><br>
+        <span class="method m-del">POST</span> <code>/delete_user</code></td>
+    <td><code>AccountViewSet</code> (self-managing singleton, no pk needed):<br>
+        <span class="method m-get">GET</span> <code>/account</code> — current account (absorbs <code>/me</code>)<br>
+        <span class="method m-put">PUT</span> <code>/account</code> — update email, timezone, selected site, date range, sites<br>
+        <span class="method m-del">DELETE</span> <code>/account</code> — delete account</td>
+  </tr>
+  <tr>
+    <td>Sites</td>
+    <td><span class="method m-get">GET</span> <code>/sites</code> (ViewSet already)<br>
+        <span class="method m-del">POST</span> <code>/delete_site</code> — deletes <em>the selected</em> site via prefs</td>
+    <td><code>SiteViewSet</code> extended from read-only to full CRUD:<br>
+        <span class="method m-get">GET</span> <code>/sites</code>, <span class="method m-get">GET</span> <code>/sites/{name}</code><br>
+        <span class="method m-del">DELETE</span> <code>/sites/{name}</code> — replaces <code>delete_site</code>; deleting by name is explicit, the selection moves with the account model</td>
+  </tr>
+  <tr>
+    <td>Share token</td>
+    <td><span class="method m-put">POST</span> <code>/reset_token</code><br>
+        <span class="method m-del">POST</span> <code>/delete_token</code></td>
+    <td>A nested subresource of the account it belongs to:<br>
+        <span class="method m-get">GET</span> <code>/account/share_token</code> — current token<br>
+        <span class="method m-put">PUT</span> <code>/account/share_token</code> — rotate<br>
+        <span class="method m-del">DELETE</span> <code>/account/share_token</code> — revoke</td>
+  </tr>
+  <tr>
+    <td>Dashboard prefs</td>
+    <td><span class="method m-get">GET</span> <code>/set_pref_site?example.com</code><br>
+        <span class="method m-get">GET</span> <code>/set_pref_range?last7</code></td>
+    <td>The model is adapted, not just the API: <code>selected_site</code> and <code>date_range</code> are promoted out of the <code>prefs</code> JSONField into real, constrained <code>User</code> columns (<code>date_range</code> as a choice field, <code>selected_site</code> optionally an FK). <code>PUT /account</code> updates them as plain fields — typed validation instead of a hand-parsed query string, and the odd-one-out <code>set_pref_site</code> query-string hack dies with it. The rest of <code>prefs</code> (<code>usesites</code>, <code>subscription_id</code>) stays a JSON blob until it earns its own field.</td>
+  </tr>
+  <tr>
+    <td>Query</td>
+    <td><span class="method m-get">GET</span> <code>/query?site=&start=&end=</code></td>
+    <td>Keep as a function view — it's a read of computed analytics, not a resource. Optionally <code>/sites/{name}/stats</code> under the router to make its ownership explicit.</td>
+  </tr>
+  <tr>
+    <td>Auth</td>
+    <td><code>/login /logout /register /recover</code></td>
+    <td>Keep as-is — session lifecycle doesn't fit CRUD. <code>/logout</code>'s referer redirect stays too.</td>
+  </tr>
+  <tr>
+    <td>Misc</td>
+    <td><code>/feedback /newsletter_register /subscribed /lang</code></td>
+    <td>Keep as small function views — one-shot actions and lookups, not resources.</td>
+  </tr>
+</table>
+
+<h2>What gets deleted</h2>
+<p><code>delete_site</code>, <code>delete_user</code>, <code>reset_token</code>,
+<code>delete_token</code>, <code>set_pref_site</code>, <code>set_pref_range</code>,
+<code>account_edit</code>, <code>me</code> — 8 endpoints replaced by
+<code>AccountViewSet</code> (with its nested <code>share_token</code> subresource)
+and an extended <code>SiteViewSet</code>, all registered on one
+<code>SimpleRouter</code>. The SPA touchpoints (navbar sign-out, setup page, share
+panel) need URL + method updates; <code>/lang</code> and the tracker are untouched.</p>
+
+<h2>Wins</h2>
+<ul>
+  <li>DRF supplies auth, validation, and 404-on-missing-object per method instead of per-function copies.</li>
+  <li>The schema (Swagger docs) is generated from <code>ModelSerializer</code>s — almost no <code>@extend_schema</code> maintenance left.</li>
+  <li>HTTP semantics: mutations stop hiding behind GET/POST, so logs, proxies, and the schema reflect what they do.</li>
+  <li><code>set_pref_site</code>'s "site is the raw query string" hack disappears — it becomes a validated model field.</li>
+</ul>
+
+<h2>Risks / notes</h2>
+<ul>
+  <li>Sessions/guest/demo access still resolves through <code>AccountAuthentication</code> unchanged.</li>
+  <li>Sites stay unique per user, lookup by <code>name</code> with the widened regex — same as today.</li>
+  <li><code>GET /account</code> replacing <code>/me</code> keeps the 401-means-signed-out contract the SPA relies on.</li>
+  <li>The <code>selected_site</code>/<code>date_range</code> promotion needs a migration plus backfill from the existing <code>prefs</code> values.</li>
+  <li>Effort: mostly mechanical; the frontend fetch layer and tests are the bulk of the diff.</li>
+</ul>
+
+<footer>counter.dev rewrite · proposal only — nothing implemented</footer>
+
+</body>
+</html>

@@ -64,12 +64,13 @@ class TestRecover:
         assert not mail.outbox
 
 
-class TestAccountEdit:
-    def test_account_edit(self, client, user):
+class TestAccountUpdate:
+    def test_account_update(self, client, user):
         client.force_login(user)
-        resp = client.post(
-            "/account_edit",
+        resp = client.put(
+            "/account",
             {"utcoffset": -60, "usesites": "true", "sites": "example.com\nwww.foo.bar/", "mail": "a@b.c"},
+            content_type="application/json",
         )
         assert resp.status_code == 200
         user.refresh_from_db()
@@ -79,19 +80,31 @@ class TestAccountEdit:
         names = sorted(Host.objects.filter(user=user).values_list("name", flat=True))
         assert names == ["example.com", "foo.bar"]
 
-    def test_account_edit_removes_deleted_sites(self, client, user):
+    def test_account_update_removes_deleted_sites(self, client, user):
         client.force_login(user)
         Host.objects.create(user=user, name="old.com")
-        resp = client.post("/account_edit", {"utcoffset": 0, "usesites": "false", "sites": "new.com", "mail": ""})
+        resp = client.put("/account", {"utcoffset": 0, "usesites": "false", "sites": "new.com", "mail": ""}, content_type="application/json")
         assert resp.status_code == 200
         names = list(Host.objects.filter(user=user).values_list("name", flat=True))
         assert names == ["new.com"]
 
-
-class TestDeleteUser:
-    def test_delete_user(self, client, user, host):
+    def test_account_update_prefs(self, client, user, host):
         client.force_login(user)
-        resp = client.post("/delete_user")
+        resp = client.put("/account", {"site": "example.com", "range": "last7"}, content_type="application/json")
+        assert resp.status_code == 200
+        user.refresh_from_db()
+        assert user.selected_site == "example.com"
+        assert user.date_range == "last7"
+
+    def test_account_update_invalid_range(self, client, user):
+        client.force_login(user)
+        assert client.put("/account", {"range": "nope"}, content_type="application/json").status_code == 400
+
+
+class TestDeleteAccount:
+    def test_delete_account(self, client, user, host):
+        client.force_login(user)
+        resp = client.delete("/account")
         assert resp.status_code == 200
         assert not User.objects.filter(username="testuser").exists()
         assert not Host.objects.filter(name="example.com").exists()
@@ -108,87 +121,82 @@ class TestFeedback:
 
 
 class TestDeleteSite:
-    def test_delete_site_removes_selected_site_and_counts(self, client, user, host, counts):
+    def test_delete_site_removes_site_and_counts(self, client, user, host, counts):
         client.force_login(user)
-        prefs = dict(user.prefs)
-        prefs["site"] = "example.com"
-        user.prefs = prefs
-        user.save()
-        resp = client.post("/delete_site")
-        assert resp.status_code == 200
+        resp = client.delete("/sites/example.com")
+        assert resp.status_code == 204
         assert not Host.objects.filter(name="example.com").exists()
 
-    def test_delete_site_without_selection(self, client, user):
+    def test_delete_site_missing(self, client, user):
         client.force_login(user)
-        assert client.post("/delete_site").status_code == 400
+        assert client.delete("/sites/nope.com").status_code == 404
+
+    def test_delete_site_clears_selection(self, client, user, host, counts):
+        user.selected_site = "example.com"
+        user.save()
+        client.force_login(user)
+        assert client.delete("/sites/example.com").status_code == 204
+        user.refresh_from_db()
+        assert user.selected_site == ""
 
 
 class TestShareToken:
-    def test_reset_and_delete_token(self, client, user):
+    def test_rotate_and_revoke_token(self, client, user):
         client.force_login(user)
-        resp = client.post("/reset_token")
+        resp = client.put("/account/share_token")
         assert resp.status_code == 200
         token = json.loads(resp.content)["token"]
         user.refresh_from_db()
         assert user.share_token == token
 
-        resp = client.post("/delete_token")
+        resp = client.delete("/account/share_token")
         assert resp.status_code == 200
         user.refresh_from_db()
         assert user.share_token == ""
 
 
 class TestPrefs:
-    def test_set_pref_site(self, client, user):
+    def test_account_returns_promoted_prefs(self, client, user):
         client.force_login(user)
-        resp = client.get("/set_pref_site?example.com")
-        assert resp.status_code == 200
-        user.refresh_from_db()
-        assert user.prefs["site"] == "example.com"
-
-    def test_set_pref_range(self, client, user):
-        client.force_login(user)
-        assert client.get("/set_pref_range?last7").status_code == 200
-        user.refresh_from_db()
-        assert user.prefs["range"] == "last7"
-
-    def test_set_pref_range_invalid(self, client, user):
-        client.force_login(user)
-        assert client.get("/set_pref_range?nope").status_code == 400
+        user.selected_site = "example.com"
+        user.date_range = "last7"
+        user.save()
+        body = client.get("/account").json()
+        assert body["user"]["prefs"] == {"site": "example.com", "range": "last7"}
 
 
-class TestMe:
-    def test_me_not_signed_in(self, client):
-        resp = client.get("/me")
+class TestAccount:
+    def test_account_not_signed_in(self, client):
+        resp = client.get("/account")
         assert resp.status_code == 401
 
-    def test_me_signed_in(self, client, user, host):
+    def test_account_signed_in(self, client, user, host):
         client.force_login(user)
-        resp = client.get("/me?utcoffset=60")
+        resp = client.get("/account?utcoffset=60")
         body = json.loads(resp.content)
         assert body["user"]["id"] == "testuser"
         assert body["user"]["uuid"] == str(user.uuid)
-        assert body["user"]["prefs"] == {}
+        assert body["user"]["prefs"] == {"site": "", "range": "day"}
         assert body["user"]["timezone"] == 0
         assert body["meta"] == {"utcoffset": 60, "sessionless": False, "demo": False}
 
-    def test_me_guest_access(self, client, user, host):
+    def test_account_guest_access(self, client, user, host):
         user.share_token = "tok123"
         user.save()
-        resp = client.get(f"/me?user={user.uuid}&token=tok123")
+        resp = client.get(f"/account?user={user.uuid}&token=tok123")
         body = json.loads(resp.content)
         assert body["user"]["id"] == "testuser"
         assert body["meta"]["sessionless"] is True
         assert body["meta"]["demo"] is False
 
-    def test_me_guest_wrong_token(self, client, user, host):
+    def test_account_guest_wrong_token(self, client, user, host):
         user.share_token = "tok123"
         user.save()
-        assert client.get(f"/me?user={user.uuid}&token=bad").status_code == 401
+        assert client.get(f"/account?user={user.uuid}&token=bad").status_code == 401
 
-    def test_me_demo_access(self, client, user, host):
+    def test_account_demo_access(self, client, user, host):
         User.objects.create_user(username="demo", password="x")
-        resp = client.get("/me?demo=1")
+        resp = client.get("/account?demo=1")
         body = json.loads(resp.content)
         assert body["meta"]["demo"] is True
         assert body["meta"]["sessionless"] is True
@@ -299,10 +307,12 @@ class TestSites:
         User.objects.create_user(username="demo", password="x")
         assert client.get("/sites?demo=1").status_code == 200
 
-    def test_sites_no_write_methods(self, client, user, host):
+    def test_sites_write_methods(self, client, user, host):
         client.force_login(user)
+        # Sites are created and edited via PUT /account, not this resource.
         assert client.post("/sites", {"name": "nope.com"}).status_code == 405
-        assert client.delete("/sites/example.com").status_code == 405
+        assert client.put("/sites/example.com", {"name": "x"}).status_code == 405
+        assert client.delete("/sites/example.com").status_code == 204
 
 
 class TestMisc:

@@ -117,7 +117,7 @@ const COMPARISON_RANGE = {
     daterange: "all",
 };
 
-let me = null; // payload of /me
+let me = null; // payload of /account
 let siteList = []; // payload of /sites (the account's real host names)
 
 // The dashboard expects every range bucket to carry all tracker categories;
@@ -318,7 +318,7 @@ async function loadAllTimeBucket() {
 }
 
 async function boot() {
-    me = await apiGetJSON("/me");
+    me = await apiGetJSON("/account");
     if (me === null) {
         window.location.href = "welcome.html";
         return;

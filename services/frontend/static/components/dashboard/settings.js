@@ -41,13 +41,8 @@ customElements.define(
                         Delete website
                       </button>
                     </div>
-                    <!-- Confirm delete -->
-                    <form class="delete-confirm" action="/delete_site" method="POST" style="display: none" id="site-delete">
-                      <input
-                        name="site"
-                        type="hidden"
-                        value="${escapeHtml(opts.cursite)}"
-                      />
+                    <!-- Confirm delete; the site name is the resource path -->
+                    <form class="delete-confirm" action="/sites/${escapeHtml(encodeURIComponent(opts.cursite))}" method="DELETE" style="display: none" id="site-delete">
                       <input
                         name="confirmSite"
                         type="text"

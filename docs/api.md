@@ -50,20 +50,36 @@ Request account recovery.
 | `mail` | string | yes | Email address on the account |
 | `user` | string | yes | Username |
 
-### POST /account_edit
+### PUT /account
 
-Update account settings.
+Update account settings. Every field is optional; absent fields keep their
+current value, so the SPA's site/range selectors PUT those alone.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `utcoffset` | integer | yes | Client UTC offset in minutes |
-| `usesites` | boolean | yes | Whether the multi-site selector is shown |
-| `sites` | string | yes | Newline-separated list of site domains |
-| `mail` | string | yes | Email address |
+| `utcoffset` | integer | no | Client UTC offset in minutes |
+| `usesites` | boolean | no | Whether the multi-site selector is shown |
+| `sites` | string | no | Newline-separated list of site domains |
+| `mail` | string | no | Email address |
+| `site` | string | no | Selected site name (dashboard prefs) |
+| `range` | string | no | Selected time range: `day`, `yesterday`, `last7`, `last30`, `month`, `year`, `all` |
 
-### POST /delete_user
+### DELETE /account
 
 Delete the account and all its data. Requires no body.
+
+### GET /account/share_token
+
+The account's current share token (`{ "token": "..." }`).
+
+### PUT /account/share_token
+
+Rotate the share token (invalidates previously issued URLs). Returns the
+token used for guest access (`?user=<id>&token=<token>`).
+
+### DELETE /account/share_token
+
+Revoke the share token. Requires no body.
 
 ### POST /feedback
 
@@ -76,31 +92,18 @@ Send product feedback.
 
 ## Sites
 
-### POST /delete_site
+`GET /sites` and `GET /sites/<name>` expose the sites resource (`Host`
+model) in name order. The list is the source of truth for which sites an
+account has (setup-vs-dashboard routing and the site selector).
 
-Delete the currently selected site and its data. Requires no body.
+```json
+[ { "name": "example.com", "hide": true }, ... ]
+```
 
-## Guest / share access
+### DELETE /sites/\<name\>
 
-### POST /reset_token
-
-Create a share token for the account. Returns the token used for guest access
-(`?user=<id>&token=<token>`).
-
-### POST /delete_token
-
-Revoke the share token. Requires no body.
-
-## Dashboard preferences
-
-### GET /set_pref_site?\<site\>
-
-Persist the selected site. The site name is the URL-encoded query string.
-
-### GET /set_pref_range?\<range\>
-
-Persist the selected time range. Value is one of `day`, `yesterday`, `last7`,
-`last30`, `month`, `year`, `all`.
+Delete a site by name and all its data (explicit, unlike the old
+`delete_site` which deleted whatever was selected). Requires no body.
 
 ## Dashboard data
 
@@ -109,10 +112,11 @@ All three endpoints serve a signed-in session, guest/share access via
 missing or invalid account answers **401** ("not signed in"); the SPA
 redirects to the welcome page accordingly.
 
-### GET /me
+### GET /account
 
 The signed-in user's state: session bootstrap, share-account panel, and
-demo/guest flags.
+demo/guest flags. `site` and `range` are dashboard prefs surfaced inside
+`prefs`.
 
 ```json
 {
@@ -120,18 +124,6 @@ demo/guest flags.
   "meta": { "utcoffset": 0, "sessionless": false, "demo": false }
 }
 ```
-
-### GET /sites
-
-Readonly DRF API (list and retrieve only) exposing the sites resource
-(`Host` model) in name order. The list is the source of truth for which
-sites an account has (setup-vs-dashboard routing and the site selector).
-
-```json
-[ { "name": "example.com", "hide": true }, ... ]
-```
-
-`GET /sites/<name>` retrieves a single site.
 
 ### GET /query
 
@@ -160,7 +152,6 @@ client-side as `start`/`end` values.
 Every category is present (empty where there is no data); `logs` holds the
 recent visits from the Redis zset.
 
-## Misc
 ## Misc
 
 ### GET /lang

@@ -4,28 +4,32 @@ import json
 from datetime import date
 
 import pytest
+from django.contrib.auth import get_user_model
 
 from core.models import Host
 from core.api import parse_log_line, _normalize_domain
 
+User = get_user_model()
+
 pytestmark = pytest.mark.django_db
 
 
-class TestAccountEditView:
+class TestAccountUpdate:
     def test_requires_auth(self, client):
-        assert client.post("/account_edit").status_code == 401
+        assert client.put("/account").status_code == 401
 
-    def test_updates_prefs_and_sites(self, client, user, host):
+    def test_updates_account_and_sites(self, client, user, host):
         other = Host.objects.create(user=user, name="remove-me.com")
         client.force_login(user)
-        resp = client.post(
-            "/account_edit",
+        resp = client.put(
+            "/account",
             {
                 "utcoffset": "-2",
                 "usesites": "true",
                 "mail": "new@example.com",
                 "sites": "example.com\nhttps://www.newsite.org/\n",
             },
+            content_type="application/json",
         )
         assert resp.status_code == 200
         user.refresh_from_db()
@@ -38,77 +42,84 @@ class TestAccountEditView:
 
     def test_invalid_utcoffset(self, client, user):
         client.force_login(user)
-        resp = client.post("/account_edit", {"utcoffset": "nope"})
+        resp = client.put("/account", {"utcoffset": "nope"}, content_type="application/json")
         assert resp.status_code == 400
 
-
-class TestDeleteSiteView:
-    def test_requires_auth(self, client):
-        assert client.post("/delete_site").status_code == 401
-
-    def test_requires_selected_site(self, client, user, host):
+    def test_invalid_range(self, client, user):
         client.force_login(user)
-        resp = client.post("/delete_site")
+        resp = client.put("/account", {"range": "bogus"}, content_type="application/json")
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "no site selected"
 
-    def test_deletes_site_and_counts(self, client, user, host, counts):
-        user.prefs = {"site": "example.com"}
+    def test_absent_fields_keep_their_value(self, client, user, host):
+        user.selected_site = "example.com"
+        user.date_range = "last30"
         user.save()
         client.force_login(user)
-        assert client.post("/delete_site").status_code == 200
+        assert client.put("/account", {"site": "example.com"}, content_type="application/json").status_code == 200
+        user.refresh_from_db()
+        assert user.date_range == "last30"
+        assert user.timezone == 0
+
+    def test_updates_selected_site_and_range(self, client, user, host):
+        client.force_login(user)
+        assert client.put("/account", {"site": "example.com", "range": "last30"}, content_type="application/json").status_code == 200
+        user.refresh_from_db()
+        assert user.selected_site == "example.com"
+        assert user.date_range == "last30"
+
+    def test_sites_sync_clears_dangling_selection(self, client, user, host):
+        user.selected_site = "remove-me.com"
+        user.save()
+        client.force_login(user)
+        assert client.put("/account", {"sites": "example.com"}, content_type="application/json").status_code == 200
+        user.refresh_from_db()
+        assert user.selected_site == ""
+
+
+class TestDeleteSite:
+    def test_requires_auth(self, client):
+        assert client.delete("/sites/example.com").status_code == 401
+
+    def test_deletes_site_and_counts(self, client, user, host, counts):
+        client.force_login(user)
+        assert client.delete("/sites/example.com").status_code == 204
         assert not Host.objects.filter(pk=host.pk).exists()
         assert not counts.exists()
 
     def test_no_such_site(self, client, user, host):
-        user.prefs = {"site": "missing.com"}
+        client.force_login(user)
+        assert client.delete("/sites/missing.com").status_code == 404
+
+    def test_delete_clears_selection(self, client, user, host, counts):
+        user.selected_site = "example.com"
         user.save()
         client.force_login(user)
-        assert client.post("/delete_site").status_code == 400
+        assert client.delete("/sites/example.com").status_code == 204
+        user.refresh_from_db()
+        assert user.selected_site == ""
 
 
-class TestShareTokens:
-    def test_reset_token(self, client, user):
+class TestShareToken:
+    def test_rotate_token(self, client, user):
         client.force_login(user)
-        resp = client.post("/reset_token")
+        resp = client.put("/account/share_token")
         assert resp.status_code == 200
         token = json.loads(resp.content)["token"]
         user.refresh_from_db()
         assert user.share_token == token
 
-    def test_delete_token(self, client, user):
+    def test_get_and_revoke_token(self, client, user):
         user.share_token = "sometoken"
         user.save()
         client.force_login(user)
-        assert client.post("/delete_token").status_code == 200
+        assert client.get("/account/share_token").json() == {"token": "sometoken"}
+        assert client.delete("/account/share_token").status_code == 200
         user.refresh_from_db()
         assert user.share_token == ""
 
     def test_requires_auth(self, client):
-        assert client.post("/reset_token").status_code == 401
-        assert client.post("/delete_token").status_code == 401
-
-
-class TestPreferences:
-    def test_set_pref_site(self, client, user):
-        client.force_login(user)
-        assert client.get("/set_pref_site", {"site": "example.com"}).status_code == 200
-        user.refresh_from_db()
-        assert user.prefs["site"] == "example.com"
-
-    def test_set_pref_site_requires_auth(self, client):
-        assert client.get("/set_pref_site", {"site": "x"}).status_code == 401
-
-    def test_set_pref_range(self, client, user):
-        client.force_login(user)
-        assert client.get("/set_pref_range", {"range": "last30"}).status_code == 200
-        user.refresh_from_db()
-        assert user.prefs["range"] == "last30"
-
-    def test_set_pref_range_invalid(self, client, user):
-        client.force_login(user)
-        resp = client.get("/set_pref_range", {"range": "bogus"})
-        assert resp.status_code == 400
+        assert client.put("/account/share_token").status_code == 401
+        assert client.delete("/account/share_token").status_code == 401
 
 
 class TestLangView:

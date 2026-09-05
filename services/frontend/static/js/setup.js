@@ -1,7 +1,7 @@
-// Not signed in (the /me endpoint answered 401) means the setup page is
+// Not signed in (the /account endpoint answered 401) means the setup page is
 // only reachable for logged-out visitors.
 async function boot() {
-    const me = await apiGetJSON("/me");
+    const me = await apiGetJSON("/account");
     if (me === null) {
         window.location.href = "index.html";
         return;

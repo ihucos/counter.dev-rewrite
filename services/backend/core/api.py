@@ -9,7 +9,7 @@ import secrets
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
@@ -21,11 +21,11 @@ from django.shortcuts import redirect
 from django.utils import timezone
 
 from rest_framework import permissions, serializers
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import NotAuthenticated, ValidationError
 from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer, Serializer
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet, ViewSet
 from drf_spectacular.utils import (
     OpenApiParameter,
     OpenApiTypes,
@@ -37,7 +37,7 @@ from .accounts import _sites_for
 from .authentication import AccountAuthentication
 from .models import Count, Host
 from .serializers import (
-    AccountEditSerializer,
+    AccountUpdateSerializer,
     FeedbackSerializer,
     LoginSerializer,
     NewsletterSerializer,
@@ -69,8 +69,8 @@ class MeMetaSerializer(Serializer):
     demo = serializers.BooleanField()
 
 
-class MeResponseSerializer(Serializer):
-    """Body of the /me response: user record and session meta."""
+class AccountResponseSerializer(Serializer):
+    """Body of the GET /account response: user record and session meta."""
 
     user = UserStateSerializer()
     meta = MeMetaSerializer()
@@ -103,8 +103,6 @@ class QueryResponseSerializer(Serializer):
 
 class TokenResponseSerializer(Serializer):
     token = serializers.CharField()
-
-RANGES = ["day", "yesterday", "last7", "last30", "month", "year", "all"]
 
 # The categories the tracker buckets visits into. The dashboard's components
 # read these dimensions unconditionally, so every range bucket sent to the
@@ -313,42 +311,6 @@ def recover_view(request):
     return Response({"ok": True})
 
 
-@extend_schema(request=AccountEditSerializer, responses=OkResponseSerializer)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def account_edit_view(request):
-    serializer = AccountEditSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    data = serializer.validated_data
-    user = request.user
-
-    user.timezone = data["utcoffset"]
-    user.email = data["mail"]
-    prefs = dict(user.prefs or {})
-    prefs["usesites"] = data["usesites"]
-    user.prefs = prefs
-
-    names = [_normalize_domain(s.strip()) for s in data["sites"].splitlines() if s.strip()]
-    existing = {h.name: h for h in Host.objects.filter(user=user)}
-    for name in names:
-        if name not in existing:
-            Host.objects.create(user=user, name=name)
-    for name, host in existing.items():
-        if name not in names:
-            host.delete()
-
-    user.save()
-    return Response({"ok": True})
-
-
-@extend_schema(request=None, responses=OkResponseSerializer)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def delete_user_view(request):
-    request.user.delete()
-    return Response({"ok": True})
-
-
 @extend_schema(request=FeedbackSerializer, responses=OkResponseSerializer, auth=None)
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
@@ -365,113 +327,7 @@ def feedback_view(request):
     return Response({"ok": True})
 
 
-# --- Sites ---------------------------------------------------------------------
-
-
-@extend_schema(request=None, responses=OkResponseSerializer)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def delete_site_view(request):
-    site = (request.user.prefs or {}).get("site")
-    if not site:
-        raise ValidationError({"detail": "no site selected"})
-    host = Host.objects.filter(user=request.user, name=site).first()
-    if host is None:
-        raise ValidationError({"detail": "no such site"})
-    host.delete()  # cascades to its Count rows
-    return Response({"ok": True})
-
-
-# --- Guest / share access --------------------------------------------------------
-
-
-@extend_schema(request=None, responses=TokenResponseSerializer)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def reset_token_view(request):
-    request.user.share_token = secrets.token_urlsafe(24)
-    request.user.save(update_fields=["share_token"])
-    return Response({"token": request.user.share_token})
-
-
-@extend_schema(request=None, responses=OkResponseSerializer)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def delete_token_view(request):
-    request.user.share_token = ""
-    request.user.save(update_fields=["share_token"])
-    return Response({"ok": True})
-
-
-# --- Dashboard preferences -------------------------------------------------------
-
-
-@extend_schema(
-    # The site name is the raw URL-encoded query string, e.g. /set_pref_site?example.com
-    parameters=[OpenApiParameter(name="site", type=str, location=OpenApiParameter.QUERY, required=False)],
-    responses=OkResponseSerializer,
-)
-@api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
-def set_pref_site_view(request):
-    # The site name is the raw URL-encoded query string, e.g. /set_pref_site?example.com
-    site = request.GET.get("site") or request.META.get("QUERY_STRING", "")
-    site = unquote(site).strip()
-    prefs = dict(request.user.prefs or {})
-    prefs["site"] = site
-    request.user.prefs = prefs
-    request.user.save(update_fields=["prefs"])
-    return Response({"ok": True})
-
-
-@extend_schema(
-    parameters=[OpenApiParameter(name="range", type=str, location=OpenApiParameter.QUERY, enum=RANGES)],
-    responses=OkResponseSerializer,
-)
-@api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
-def set_pref_range_view(request):
-    value = request.GET.get("range") or request.META.get("QUERY_STRING", "")
-    value = unquote(value).strip()
-    if value not in RANGES:
-        raise ValidationError({"detail": "invalid range"})
-    prefs = dict(request.user.prefs or {})
-    prefs["range"] = value
-    request.user.prefs = prefs
-    request.user.save(update_fields=["prefs"])
-    return Response({"ok": True})
-
-
 # --- Dashboard data ---------------------------------------------------------------
-
-
-@extend_schema(responses=MeResponseSerializer)
-@api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
-def me_view(request):
-    """The signed-in user's state: user record and session meta.
-
-    Feeds session bootstrap (401 means "not signed in") and the
-    share-account panel.
-    """
-    return Response(
-        MeResponseSerializer(
-            {
-                "user": {
-                    "id": request.user.username,
-                    "uuid": str(request.user.uuid) if request.user.uuid else "",
-                    "token": request.user.share_token,
-                    "prefs": request.user.prefs or {},
-                    "timezone": request.user.timezone,
-                },
-                "meta": {
-                    "utcoffset": _utcoffset(request),
-                    "sessionless": request.sessionless,
-                    "demo": request.demo,
-                },
-            }
-        ).data
-    )
 
 
 @extend_schema(
@@ -578,6 +434,118 @@ def subscribed_view(request):
     return Response({"ok": True})
 
 
+# --- Account resource (the signed-in user) ------------------------------------------
+
+
+class AccountViewSet(ViewSet):
+    """Singleton resource for the signed-in account, no pk.
+
+    GET /account returns the account state (401 means "not signed in"), PUT
+    updates it, DELETE removes it. The AccountAuthentication above resolves
+    sessions, guest/share access and demo access to request.user.
+    """
+
+    authentication_classes = [AccountAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="user", type=str, location=OpenApiParameter.QUERY, description="Account uuid for guest/share access"),
+            OpenApiParameter(name="token", type=str, location=OpenApiParameter.QUERY, description="Share token for guest/share access"),
+            OpenApiParameter(name="demo", type=bool, location=OpenApiParameter.QUERY, description="Read-only demo access to the demo site"),
+        ],
+        responses=AccountResponseSerializer,
+    )
+    def list(self, request):
+        """The signed-in user's state: user record and session meta.
+
+        Feeds session bootstrap and the share-account panel. selected_site
+        and date_range are promoted User columns, but surface inside prefs so
+        the SPA keeps reading one prefs dict.
+        """
+        user = request.user
+        prefs = dict(user.prefs or {})
+        prefs["site"] = user.selected_site
+        prefs["range"] = user.date_range
+        return Response(
+            AccountResponseSerializer(
+                {
+                    "user": {
+                        "id": user.username,
+                        "uuid": str(user.uuid) if user.uuid else "",
+                        "token": user.share_token,
+                        "prefs": prefs,
+                        "timezone": user.timezone,
+                    },
+                    "meta": {
+                        "utcoffset": _utcoffset(request),
+                        "sessionless": request.sessionless,
+                        "demo": request.demo,
+                    },
+                }
+            ).data
+        )
+
+    @extend_schema(request=AccountUpdateSerializer, responses=OkResponseSerializer)
+    def update(self, request):
+        """Update email, timezone, the sites list and the dashboard prefs
+        (selected site / date range). Absent fields keep their value: the
+        SPA's selectors PUT site or range alone."""
+        serializer = AccountUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        user = request.user
+
+        if "utcoffset" in data:
+            user.timezone = data["utcoffset"]
+        if "mail" in data:
+            user.email = data["mail"]
+        if "usesites" in data:
+            prefs = dict(user.prefs or {})
+            prefs["usesites"] = data["usesites"]
+            user.prefs = prefs
+        if "sites" in data:
+            names = [_normalize_domain(s.strip()) for s in data["sites"].splitlines() if s.strip()]
+            existing = {h.name: h for h in Host.objects.filter(user=user)}
+            for name in names:
+                if name not in existing:
+                    Host.objects.create(user=user, name=name)
+            for name, host in existing.items():
+                if name not in names:
+                    host.delete()
+            # A selected site removed with the list must not dangle.
+            if user.selected_site and user.selected_site not in names:
+                user.selected_site = ""
+        if "site" in data:
+            user.selected_site = data["site"].strip()
+        if "range" in data:
+            user.date_range = data["range"]
+        user.save()
+        return Response({"ok": True})
+
+    @extend_schema(request=None, responses=OkResponseSerializer)
+    def destroy(self, request):
+        request.user.delete()
+        return Response({"ok": True})
+
+    @extend_schema(
+        request=None,
+        responses={"GET": TokenResponseSerializer, "PUT": TokenResponseSerializer, "DELETE": OkResponseSerializer},
+    )
+    @action(detail=False, methods=["get", "put", "delete"])
+    def share_token(self, request):
+        """The account's share token: GET shows it, PUT rotates it, DELETE
+        revokes it (guest access dies with the token)."""
+        if request.method == "PUT":
+            request.user.share_token = secrets.token_urlsafe(24)
+            request.user.save(update_fields=["share_token"])
+        elif request.method == "DELETE":
+            request.user.share_token = ""
+            request.user.save(update_fields=["share_token"])
+            return Response(OkResponseSerializer({"ok": True}).data)
+        return Response(TokenResponseSerializer({"token": request.user.share_token}).data)
+
+
 # --- Sites resource (Host model) ---------------------------------------------------
 
 
@@ -596,11 +564,13 @@ class HostSerializer(ModelSerializer):
         ],
     ),
 )
-class SiteViewSet(ReadOnlyModelViewSet):
-    """List/retrieve only: the sites a user has, in name order.
+class SiteViewSet(ModelViewSet):
+    """The sites a user has, in name order.
 
-    The list response is the source of truth for which sites an account
-    has (setup-vs-dashboard routing and the site selector). The
+    Only reads and destroy are enabled: sites are created and edited via the
+    account's sites list (PUT /account), so there is no POST/PUT here. The
+    list response is the source of truth for which sites an account has
+    (setup-vs-dashboard routing and the site selector). The
     AccountAuthentication above resolves sessions, guest/share access and
     demo access to request.user.
     """
@@ -613,6 +583,15 @@ class SiteViewSet(ReadOnlyModelViewSet):
     # default lookup regex (which excludes dots) is widened.
     lookup_field = "name"
     lookup_value_regex = "[^/]+"
+    http_method_names = ["get", "delete"]
 
     def get_queryset(self):
         return _sites_for(self.request.user)
+
+    def perform_destroy(self, instance):
+        # Clear a dangling selection when the selected site is deleted.
+        user = self.request.user
+        if user.selected_site == instance.name:
+            user.selected_site = ""
+            user.save(update_fields=["selected_site"])
+        instance.delete()  # cascades to its Count rows
