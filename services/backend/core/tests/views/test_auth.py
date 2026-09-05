@@ -34,14 +34,14 @@ class TestRegisterView:
     def test_register_success(self, client):
         resp = client.post(
             "/register",
-            {"user": "newuser", "password": "pw123456", "mail": "n@example.com", "utcoffset": "120"},
+            {"user": "newuser", "password": "pw123456", "mail": "n@example.com", "utcoffset": "2"},
         )
         assert resp.status_code == 200
         assert resp.content == b"ok"
         from counter.models import User
         account = User.objects.get(username="newuser")
         assert account.email == "n@example.com"
-        assert account.timezone == 120
+        assert account.timezone == 2
 
     def test_register_logs_user_in(self, client):
         client.post("/register", {"user": "newuser", "password": "pw123456"})

@@ -22,12 +22,16 @@ class Counter extends HTMLElement {
     }
 
     draw(allVisits, curTime, utcoffset) {
-        let count = this.count(this.normalizeVisits(allVisits[curTime]));
+        // Ranges without data (or the daterange bucket) may be missing or
+        // bare {}; normalize before reading dimensions off them.
+        let curVisits = this.normalizeVisits(allVisits[curTime]);
+        let nextVisits = this.normalizeVisits(allVisits[this.nextTime[curTime]]);
+        let count = this.count(curVisits);
         let nextCurTime = this.nextTime[curTime];
-        let nextCount = this.count(this.normalizeVisits(allVisits[nextCurTime]));
+        let nextCount = this.count(nextVisits);
 
-        let datesPassedCurTime = Object.keys(dFillDatesToNow(allVisits[curTime].date, utcoffset), utcoffset).length;
-        let datesPassedNextTime = Object.keys(dFillDatesToNow(allVisits[nextCurTime].date, utcoffset)).length;
+        let datesPassedCurTime = Object.keys(dFillDatesToNow(curVisits.date, utcoffset), utcoffset).length;
+        let datesPassedNextTime = Object.keys(dFillDatesToNow(nextVisits.date, utcoffset)).length;
 
         // hotfix: yesteday is special because it is a point in time and not time range
         // starting from now

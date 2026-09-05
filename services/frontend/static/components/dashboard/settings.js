@@ -77,7 +77,8 @@ customElements.define(
 
             let tc = this.querySelector("counter-trackingcode");
             customElements.upgrade(tc);
-            tc.draw(opts.uuid, opts.utcoffset);
+            // The tracking code keys on the username (see counter-trackingcode.js).
+            tc.draw(opts.id, opts.utcoffset);
         }
     },
 );

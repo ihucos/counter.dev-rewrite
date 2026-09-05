@@ -35,3 +35,18 @@ docker compose up       # from the repo root; the gateway on :80 is the
 `localhost:80` shows the rejection page listing the hostnames, so a wrong
 URL tells you how to fix itself. Testing, e2e suite and further details:
 [testing.md](testing.md), [architecture.md](architecture.md).
+
+## Management commands
+
+The backend container runs `manage.py migrate`, `manage.py createdemodata`
+and `manage.py runserver` on start; sync runs
+`manage.py sync --forever --sleep 1`. Locally you can invoke them with
+`uv run python manage.py <command>` from `services/backend`.
+
+- `createdemodata` — seeds the read-only demo account behind the landing
+  page's "Live demo" link (`dashboard.html?demo=1`): a `demo` user with a
+  `counter.dev` site and ~60 days of plausible counts (login password:
+  `demo-demo-demo`). Idempotent — it does nothing if data is already
+  present, and reseeds from scratch if the seed predates a category.
+- `sync [--forever] [--sleep N]` — drains visit buckets from Redis into
+  Postgres (see [architecture.md](architecture.md)).

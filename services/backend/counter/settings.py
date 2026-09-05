@@ -1,17 +1,16 @@
 import os
 from pathlib import Path
-import socket
 
 
-def host(h):
-    try:
-        socket.gethostbyname(h)
-        return h
-    except socket.gaierror:
-        return "localhost"
-
-
+# Service hostnames: the compose services export POSTGRES_HOST/REDIS_HOST so
+# containers reach each other by Docker DNS name, while the default
+# "localhost" fits host-side runs (backend tests, local dev). Never fall back
+# to "localhost" on a failed DNS probe inside a container — that silently
+# pointed sync at its own loopback and crash-looped it.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "localhost")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
@@ -57,7 +56,7 @@ DATABASES = {
         "NAME": "counter",
         "USER": "counter",
         "PASSWORD": "counter",
-        "HOST": host("postgres"),
+        "HOST": POSTGRES_HOST,
         "PORT": 5432,
     }
 }
@@ -65,7 +64,7 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"redis://{host('redis')}:6379/0",
+        "LOCATION": f"redis://{REDIS_HOST}:6379/0",
     }
 }
 

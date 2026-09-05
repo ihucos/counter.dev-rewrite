@@ -21,7 +21,7 @@ class TestAccountEditView:
         resp = client.post(
             "/account_edit",
             {
-                "utcoffset": "-60",
+                "utcoffset": "-2",
                 "usesites": "true",
                 "mail": "new@example.com",
                 "sites": "example.com\nhttps://www.newsite.org/\n",
@@ -29,7 +29,7 @@ class TestAccountEditView:
         )
         assert resp.status_code == 200
         user.refresh_from_db()
-        assert user.timezone == -60
+        assert user.timezone == -2
         assert user.email == "new@example.com"
         assert user.prefs["usesites"] is True
         names = set(Host.objects.filter(user=user).values_list("name", flat=True))
@@ -242,3 +242,21 @@ def test_normalize_domain():
     assert _normalize_domain("https://www.example.com/") == "example.com"
     assert _normalize_domain("http://example.com") == "example.com"
     assert _normalize_domain("example.com") == "example.com"
+
+
+def test_local_date_uses_hours():
+    # The tracker and frontend treat utcoffset as whole hours; the backend
+    # must not interpret it as minutes (the unit mismatch used to bucket
+    # visits into the wrong day away from UTC).
+    from datetime import timedelta
+
+    from django.utils import timezone as dj_timezone
+
+    from core.views import _local_date
+
+    now = dj_timezone.now()
+    assert _local_date(2) == (now + timedelta(hours=2)).date()
+    assert _local_date(-2) == (now - timedelta(hours=2)).date()
+    # clamped like the tracker (parseUTCOffset in handler.go)
+    assert _local_date(600) == (now + timedelta(hours=14)).date()
+    assert _local_date(-600) == (now - timedelta(hours=12)).date()

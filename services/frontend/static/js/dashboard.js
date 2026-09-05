@@ -60,7 +60,10 @@ connectData("dashboard-addbtn", (dump) => [dump.meta.sessionless]);
 
 connectData("dashboard-download", (dump) => [dump.sites[selector.site].visits[selector.range], selector.site, selector.range, dump.meta.sessionless]);
 
-connectData("counter-trackingcode", (dump) => [dump.user.uuid, dump.user.prefs.utcoffset || getUTCOffset()]);
+// The tracking code keys on the username: the tracker buckets visits under
+// the data-id it is given, sync.py maps that id to the account and the
+// dashboard reads visit logs from log:<site>:<username>.
+connectData("counter-trackingcode", (dump) => [dump.user.id, dump.user.prefs.utcoffset || getUTCOffset()]);
 
 connectData("dashboard-dynamics", (dump) => [dump.sites[selector.site].visits[selector.range]["date"], dump.user.prefs.utcoffset || getUTCOffset()]);
 
@@ -69,7 +72,7 @@ connectData("dashboard-graph", (dump) => [dump.sites[selector.site].visits[selec
 connectData("dashboard-settings", (dump) => [
     {
         cursite: selector.site,
-        uuid: dump.user.uuid,
+        id: dump.user.id,
         meta: dump.meta,
         utcoffset: dump.user.prefs.utcoffset || getUTCOffset(),
     },
@@ -149,6 +152,24 @@ function addArchivesToDump(archives, dump) {
     return dump;
 }
 
+// The dashboard expects every range bucket to carry all tracker categories;
+// fill in empty maps for dimensions the backend had no data for (new
+// accounts, unused ranges, custom dateranges).
+const VISIT_DIMENSIONS = [
+    "lang", "ref", "page", "date", "weekday", "platform",
+    "browser", "device", "country", "screen", "hour",
+];
+
+function normalizeBucket(bucket) {
+    bucket = bucket || {};
+    for (const dim of VISIT_DIMENSIONS) {
+        if (!bucket[dim]) {
+            bucket[dim] = {};
+        }
+    }
+    return bucket;
+}
+
 function addDaterangeToDump(daterange, dump) {
     for (const site of Object.keys(dump.sites)) {
         let siteData = daterange[site];
@@ -158,6 +179,7 @@ function addDaterangeToDump(daterange, dump) {
         } else {
             dump.sites[site].visits.daterange = nildata;
         }
+        normalizeBucket(dump.sites[site].visits.daterange);
     }
 }
 
@@ -194,10 +216,15 @@ document.addEventListener("redraw", (evt) => {
     let dump = evt.detail;
     console.log("redraw", dump);
     allConnectedData.forEach(([el, getData]) => {
-        if (customElements.get(el.localName)) {
-            el.draw(...getData(dump));
-        } else {
-            customElements.whenDefined(el.localName).then(() => el.draw(...getData(dump)));
+        // One broken component must not blank out the rest of the dashboard.
+        try {
+            if (customElements.get(el.localName)) {
+                el.draw(...getData(dump));
+            } else {
+                customElements.whenDefined(el.localName).then(() => el.draw(...getData(dump)));
+            }
+        } catch (err) {
+            console.error("redraw of", el.localName, "failed:", err);
         }
     });
 });

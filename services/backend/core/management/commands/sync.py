@@ -5,6 +5,7 @@ from urllib.parse import unquote
 from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.db import connection
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from core.models import Count, Host
 from django.contrib.auth import get_user_model
@@ -51,9 +52,15 @@ class Command(BaseCommand):
         sleep_secs = options["sleep"]
         cursor = 0
         while True:
-            cursor, keys = self.redis.scan(
-                cursor=cursor, match="v:*,*,*,*-*-*", count=options["batch_size"]
-            )
+            try:
+                cursor, keys = self.redis.scan(
+                    cursor=cursor, match="v:*,*,*,*-*-*", count=options["batch_size"]
+                )
+            except RedisConnectionError:
+                # Redis may still be starting up; retry instead of dying.
+                print("Redis not reachable yet, retrying in 5s...")
+                sleep(5)
+                continue
             self._handle_keys_batch(keys)
 
             if cursor == 0 and not forever:

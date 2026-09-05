@@ -9,7 +9,8 @@ document.addEventListener("push-dump", (evt) => {
     }
     customElements.whenDefined("counter-trackingcode").then(() => {
         let el = document.querySelector("counter-trackingcode");
-        el.draw(dump.user.uuid, dump.user.prefs.utcoffset || getUTCOffset());
+        // The tracking code keys on the username (see dashboard.js).
+        el.draw(dump.user.id, dump.user.prefs.utcoffset || getUTCOffset());
     });
 });
 

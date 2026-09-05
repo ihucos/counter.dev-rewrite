@@ -1,32 +1,57 @@
 # Design issues & known gaps
 
-Found while building the e2e suite; each needs a decision or deliberate
-follow-up, not a quick fix.
+Found while building the e2e suite and clicking through the UI. Items marked
+**fixed** are kept as a record of what changed; the rest need a decision or
+deliberate follow-up, not a quick fix.
 
-## Tracking id: uuid vs. username
+## Tracking id: uuid vs. username — fixed
 
-The tracking code sends `data-id` = **uuid**, but the backend keys on
-**username** (`sync.py` user lookup, visit log key), so uuid-keyed visits are
-silently dropped. Pick one identifier and align tracking code, `sync.py` and
-the log key; the e2e tests ingest with the username.
+The tracking code now embeds `data-id` = **username** (the tracking-code
+component reads `dump.user.id`), matching `sync.py`'s username lookup and the
+`log:<host>:<username>` log key. The uuid stays as the account identifier for
+guest/share links (`?user=<uuid>&token=...`). e2e tests ingest with the
+data-id parsed from the tracking code itself.
 
-## Backend doesn't send what the dashboard expects
+## Backend doesn't send what the dashboard expects — fixed
 
-The frontend still expects the old counter.dev protocol: the `push-archive`
-event (never sent — crashed every dump, now patched to fall back to the
-backend's `last7`/`last30`), plus `meta.sessionless`, `meta.demo` and
-`user.token`, which are read by components but never included in `/dump`.
+`/dump` now includes:
 
-## Crashes on empty ranges
+- every tracker category in every range bucket (`ref`, `date`, `hour`,
+  `device`, `platform`, `browser`, `country`, `lang`, `screen`, `page`,
+  `weekday`), empty where there is no data;
+- `meta.sessionless` (guest access) and `meta.demo` (`?demo=1`);
+- `user.token` (the account's share token).
 
-Sites without data in a range return `{}` buckets; `dynamics.js`,
-`screens.js`, `base/pwyw.js` and the navbar assume all categories exist and
-throw, aborting the whole `redraw` loop. `_base.js` `normalizeVisits` shows
-the fix pattern; until fixed, new accounts render incompletely and the full
-dashboard-rendering e2e test stays removed.
+The `push-archive` event is still never sent; the frontend falls back to the
+backend's `last7`/`last30` buckets. The frontend additionally normalizes
+buckets and isolates redraw errors per component, so a missing dimension can
+no longer blank the whole dashboard.
 
-## utcoffset unit mismatch
+## Demo mode — fixed
 
-The frontend and tracker treat utcoffset as **hours**, the backend
-(`_local_date`, `User.timezone`) as **minutes**. Around midnight this can
-bucket visits into the wrong day away from UTC.
+`dashboard.html?demo=1` (the landing page's "Live demo" link) resolves to the
+seeded `demo` account without a session. The backend seeds it on start via
+`manage.py createdemodata` (idempotent, see `services/backend/compose.yaml`).
+
+## utcoffset unit mismatch — fixed
+
+The backend interpreted utcoffset as minutes while the tracker and frontend
+use hours; `_local_date` now applies hours and clamps to -12..14 like the
+tracker.
+
+## sync crash-loop on startup — fixed
+
+`settings.py` used a DNS probe with a `localhost` fallback that resolved
+before Docker DNS was ready and pointed sync at its own loopback. Hostnames
+now come from `POSTGRES_HOST`/`REDIS_HOST` (set to the service names in
+compose, defaulting to localhost for host-side runs), and the sync loop
+retries instead of dying when Redis is briefly unreachable.
+
+## Still open
+
+- `push-archive` is never sent by the backend (frontend has a fallback).
+- The frontend `utils.js` self-tracking snippet points at
+  `simple-web-analytics.com` and `cdn.counter.dev/script-testing.js`;
+  decide what counter.dev should use to track its own traffic.
+- `services/backend/static/` is a stale duplicate of the frontend static
+  files (served by Django for its own pages only) and has drifted.

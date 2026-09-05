@@ -7,10 +7,12 @@ test("signing up lands on the setup page showing the new user", async ({ page })
 
   await expect(page).toHaveURL(/\/setup\.html$/);
   await expect(page.locator(".fill-username").first()).toHaveText(user);
-  // The tracking code shown to the user must contain a non-empty uuid.
+  // The tracking code keys on the username: sync.py and the dashboard's
+  // visit-log lookup map the data-id back to the account by username.
   await expect(page.locator("counter-trackingcode input")).toHaveValue(
-    /data-id="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"/i,
+    new RegExp(`data-id="${user}"`),
   );
+  await expect(page.locator("counter-trackingcode input")).toHaveValue(/data-utcoffset="[-0-9]+"/);
 });
 
 test("signing up twice with the same username shows an error", async ({ page }) => {

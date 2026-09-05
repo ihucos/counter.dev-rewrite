@@ -54,9 +54,10 @@ the tracker via the gateway as `t.counterdev` (`POST /track` and
 the dashboard renders.
 This requires the `tracker` and `sync` compose services to be running (the
 `webServer` config starts them); the browser runs pinned to UTC so the
-"today" bucket matches between tracker and dashboard. Known dashboard gaps
-that block fuller dashboard coverage are documented in
-`docs/design-issues.md`.
+"today" bucket matches between tracker and dashboard. `tests/fixes.spec.ts`
+additionally covers the regression fixes from `docs/design-issues.md`: an
+empty dashboard rendering without errors, the username-keyed tracking code
+ingesting end-to-end, and the `?demo=1` live demo working without a session.
 
 Failures leave a trace in `e2e/test-results/` (`npx playwright show-trace
 <path-to-trace.zip>`).

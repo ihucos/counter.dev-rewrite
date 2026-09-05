@@ -55,9 +55,15 @@ def _utcoffset(request):
         return 0
 
 
-def _local_date(utcoffset_minutes):
-    """Today's date in the viewer's timezone, from a UTC offset in minutes."""
-    return (timezone.now() + timedelta(minutes=utcoffset_minutes)).date()
+def _local_date(utcoffset_hours):
+    """Today's date in the viewer's timezone, from a UTC offset in hours.
+
+    The tracker and the frontend both treat utcoffset as whole hours (the
+    tracking script embeds e.g. data-utcoffset="2"); stay consistent with
+    them and clamp like the tracker does.
+    """
+    utcoffset_hours = max(-12, min(14, utcoffset_hours))
+    return (timezone.now() + timedelta(hours=utcoffset_hours)).date()
 
 
 def _normalize_domain(value):
@@ -164,11 +170,29 @@ def _sites_for(user):
     return hosts.order_by("name")
 
 
-def _build_dump_payload(utcoffset, user, from_date=None, to_date=None) -> dict[str, Any]:
+# The categories the tracker buckets visits into. The dashboard's components
+# read these dimensions unconditionally, so every range bucket sent to the
+# frontend must contain them (empty if there is no data yet).
+CATEGORIES = [
+    "lang",
+    "ref",
+    "page",
+    "date",
+    "weekday",
+    "platform",
+    "browser",
+    "device",
+    "country",
+    "screen",
+    "hour",
+]
+
+
+def _build_dump_payload(utcoffset, user, from_date=None, to_date=None, demo=False, sessionless=False) -> dict[str, Any]:
     """
     Build the full account state: user record, preferences, and visit data.
 
-    Visits are bucketed by the client's local time (utcoffset in minutes).
+    Visits are bucketed by the viewer's local time (utcoffset in hours).
     Custom range requests additionally include a "custom" bucket.
     """
     today = _local_date(utcoffset)
@@ -187,6 +211,11 @@ def _build_dump_payload(utcoffset, user, from_date=None, to_date=None) -> dict[s
         }
         if from_date:
             visits["custom"] = _query_site_data(host, from_date, to_date or from_date)
+        # Fill in empty buckets for categories with no data so the frontend
+        # never reads undefined dimensions.
+        for bucket in visits.values():
+            for category in CATEGORIES:
+                bucket.setdefault(category, {})
         sites_data[host.name] = {
             "visits": visits,
             "logs": _get_user_logs(user, site=host.name, limit=30),
@@ -196,12 +225,15 @@ def _build_dump_payload(utcoffset, user, from_date=None, to_date=None) -> dict[s
         "user": {
             "id": user.username,
             "uuid": str(user.uuid) if user.uuid else "",
+            "token": user.share_token,
             "prefs": user.prefs or {},
             "timezone": user.timezone,
         },
         "meta": {
             "utcoffset": utcoffset,
             "range": user.prefs.get("range", "day") if user.prefs else "day",
+            "sessionless": sessionless,
+            "demo": demo,
         },
         "sites": sites_data,
     }
@@ -386,6 +418,13 @@ def _guest_user(request):
     return account
 
 
+def _demo_user(request):
+    """Resolve demo access (?demo=1) to the seeded "demo" account, if any."""
+    if request.GET.get("demo") not in ("1", "true"):
+        return None
+    return User.objects.filter(username="demo").first()
+
+
 # --- Dashboard preferences -------------------------------------------------------
 
 
@@ -430,10 +469,22 @@ def dump_sse(request):
     Event types: "signedin" (session established), "dump" (full state, resent
     periodically), "nouser" (no signed-in user).
 
-    Authentication is the session cookie, or guest/share access via
-    ?user=<uuid>&token=<token>.
+    Authentication is the session cookie, guest/share access via
+    ?user=<uuid>&token=<token>, or demo access via ?demo=1 (the seeded
+    "demo" account, read-only).
     """
-    user = request.user if request.user.is_authenticated else _guest_user(request)
+    sessionless = False
+    demo = False
+    user = request.user if request.user.is_authenticated else None
+    if user is None:
+        user = _guest_user(request)
+        if user is not None:
+            sessionless = True
+        else:
+            user = _demo_user(request)
+            if user is not None:
+                sessionless = True
+                demo = True
     try:
         utcoffset = _utcoffset(request)
         from_date = date.fromisoformat(request.GET["from"]) if request.GET.get("from") else None
@@ -452,7 +503,9 @@ def dump_sse(request):
         interval = 15
         while True:
             try:
-                payload = _build_dump_payload(utcoffset, user, from_date, to_date)
+                payload = _build_dump_payload(
+                    utcoffset, user, from_date, to_date, demo=demo, sessionless=sessionless
+                )
                 yield message("dump", payload)
             except Exception:
                 yield message("nouser", {})
