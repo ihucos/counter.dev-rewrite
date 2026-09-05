@@ -22,5 +22,5 @@ class CorsMiddleware:
             response["Access-Control-Allow-Credentials"] = "true"
             response["Vary"] = "Origin"
         if request.method == "OPTIONS" and allowed:
-            response["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            response["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
