@@ -23,4 +23,7 @@ class CorsMiddleware:
             response["Vary"] = "Origin"
         if request.method == "OPTIONS" and allowed:
             response["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            # The selectors PUT JSON bodies; form posts are safelisted but
+            # application/json is not.
+            response["Access-Control-Allow-Headers"] = "Content-Type"
         return response
