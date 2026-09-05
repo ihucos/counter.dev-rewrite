@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API_BASE, addSite, listSites, readMe, signUp, uniqueName } from "./helpers";
+import { API_BASE, addSite, gotoDashboard, listSites, readMe, signUp, uniqueName } from "./helpers";
 
 // Tests for the account-level flows reachable through the UI: sign out,
 // the edit-account modal (settings + sites), deleting a site, feedback,
@@ -33,7 +33,7 @@ test("editing the account through the modal saves settings and sites", async ({ 
   await signUp(page, user);
   await addSite(page, "e2e-edit-a.example");
 
-  await page.goto("/dashboard.html");
+  await gotoDashboard(page);
   await expect(page.locator("#site-select")).toHaveValue("e2e-edit-a.example", {
     timeout: 15_000,
   });
@@ -78,7 +78,7 @@ test("deleting the selected site through the settings modal", async ({ page }) =
   await signUp(page, user);
   await addSite(page, "e2e-delete.example");
 
-  await page.goto("/dashboard.html");
+  await gotoDashboard(page);
   await expect(page.locator("#site-select")).toHaveValue("e2e-delete.example", {
     timeout: 15_000,
   });
@@ -112,7 +112,7 @@ test("revoking the share token locks out guest access", async ({ page, browser }
   const user = uniqueName();
   await signUp(page, user);
   await addSite(page, "e2e-token.example");
-  await page.goto("/dashboard.html");
+  await gotoDashboard(page);
   await expect(page.locator("#site-select")).toHaveValue("e2e-token.example", {
     timeout: 15_000,
   });

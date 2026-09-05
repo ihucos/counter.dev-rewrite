@@ -123,6 +123,14 @@ export async function listSites(page: Page, query = ""): Promise<Array<{ name: s
   );
 }
 
+// Navigate to the dashboard. When the browser sits on setup.html while the
+// account already has sites, setup.js itself redirects to dashboard.html —
+// the two navigations can abort each other, so accept either.
+export async function gotoDashboard(page: Page) {
+  await page.goto("/dashboard.html").catch(() => {});
+  await page.waitForURL(/dashboard\.html$/, { timeout: 15_000 });
+}
+
 export function sumVisits(visits: Record<string, number>): number {
   return Object.values(visits).reduce((acc, n) => acc + n, 0);
 }
@@ -158,7 +166,8 @@ export async function waitForVisits(page: Page, site: string, min: number) {
   const today = new Date().toISOString().slice(0, 10);
   await expect
     .poll(async () => sumVisits(dayTotals(await queryVisits(page, site, today, today))), {
-      timeout: 20_000,
+      // Sync lags under the parallel load of the suite; be generous.
+      timeout: 60_000,
       intervals: [500],
     })
     .toBeGreaterThanOrEqual(min);

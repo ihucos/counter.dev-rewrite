@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   API_BASE,
   addSite,
+  gotoDashboard,
   signUp,
   trackVisit,
   uniqueName,
@@ -13,9 +14,6 @@ import {
 // username-keyed tracking code, utcoffset units).
 
 test("a fresh account's dashboard renders every panel without errors", async ({ page }) => {
-  // Skipped for now: blocked by the ingest/sync bug that leaves the dashboard
-  // with zero visits; not critical for the moment.
-  test.skip(true, "dashboard ingest/sync pipeline currently delivers no data");
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(err.message));
 
@@ -23,7 +21,7 @@ test("a fresh account's dashboard renders every panel without errors", async ({ 
   await signUp(page, user);
   await addSite(page, "e2e-empty.example");
 
-  await page.goto("/dashboard.html");
+  await gotoDashboard(page);
   await expect(page.locator("#site-select")).toHaveValue("e2e-empty.example", {
     timeout: 15_000,
   });
@@ -35,9 +33,6 @@ test("a fresh account's dashboard renders every panel without errors", async ({ 
 });
 
 test("the tracking code keys on the username and ingests end-to-end", async ({ page }) => {
-  // Skipped for now: blocked by the ingest/sync bug that leaves the dashboard
-  // with zero visits; not critical for the moment.
-  test.skip(true, "dashboard ingest/sync pipeline currently delivers no data");
   const user = uniqueName();
   await signUp(page, user);
   await addSite(page, "e2e-username.example");
@@ -53,7 +48,7 @@ test("the tracking code keys on the username and ingests end-to-end", async ({ p
   expect(dataId).toBe(user);
 
   await trackVisit("e2e-username.example", dataId, { country: "DE" });
-  await page.goto("/dashboard.html");
+  await gotoDashboard(page);
   await expect(page.locator("#site-select")).toHaveValue("e2e-username.example", {
     timeout: 15_000,
   });
