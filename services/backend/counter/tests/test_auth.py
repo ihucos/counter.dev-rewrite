@@ -93,7 +93,7 @@ class TestAccountUpdate:
         resp = client.put("/account", {"site": "example.com", "range": "last7"}, content_type="application/json")
         assert resp.status_code == 200
         user.refresh_from_db()
-        assert user.selected_site == "example.com"
+        assert user.selected_site == host
         assert user.date_range == "last7"
 
     def test_account_update_invalid_range(self, client, user):
@@ -132,12 +132,12 @@ class TestDeleteSite:
         assert client.delete("/sites/nope.com").status_code == 404
 
     def test_delete_site_clears_selection(self, client, user, host, counts):
-        user.selected_site = "example.com"
+        user.selected_site = host
         user.save()
         client.force_login(user)
         assert client.delete("/sites/example.com").status_code == 204
         user.refresh_from_db()
-        assert user.selected_site == ""
+        assert user.selected_site is None
 
 
 class TestShareToken:
@@ -156,9 +156,9 @@ class TestShareToken:
 
 
 class TestPrefs:
-    def test_account_returns_promoted_prefs(self, client, user):
+    def test_account_returns_promoted_prefs(self, client, user, host):
         client.force_login(user)
-        user.selected_site = "example.com"
+        user.selected_site = host
         user.date_range = "last7"
         user.save()
         body = client.get("/account").json()

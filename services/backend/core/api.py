@@ -465,7 +465,7 @@ class AccountViewSet(ViewSet):
         """
         user = request.user
         prefs = dict(user.prefs or {})
-        prefs["site"] = user.selected_site
+        prefs["site"] = user.selected_site.name if user.selected_site else ""
         prefs["range"] = user.date_range
         return Response(
             AccountResponseSerializer(
@@ -512,12 +512,16 @@ class AccountViewSet(ViewSet):
                     Host.objects.create(user=user, name=name)
             for name, host in existing.items():
                 if name not in names:
-                    host.delete()
-            # A selected site removed with the list must not dangle.
-            if user.selected_site and user.selected_site not in names:
-                user.selected_site = ""
+                    host.delete()  # SET_NULL clears selected_site in the DB
+                    # Keep the in-memory user consistent so the save below
+                    # doesn't resurrect the deleted selection.
+                    if user.selected_site_id == host.pk:
+                        user.selected_site_id = None
         if "site" in data:
-            user.selected_site = data["site"].strip()
+            name = _normalize_domain(data["site"].strip())
+            user.selected_site = (
+                Host.objects.filter(user=user, name=name).first() if name else None
+            )
         if "range" in data:
             user.date_range = data["range"]
         user.save()
@@ -589,9 +593,5 @@ class SiteViewSet(ModelViewSet):
         return _sites_for(self.request.user)
 
     def perform_destroy(self, instance):
-        # Clear a dangling selection when the selected site is deleted.
-        user = self.request.user
-        if user.selected_site == instance.name:
-            user.selected_site = ""
-            user.save(update_fields=["selected_site"])
+        # Deleting the selected site clears user.selected_site via SET_NULL.
         instance.delete()  # cascades to its Count rows

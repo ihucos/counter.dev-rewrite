@@ -20,7 +20,12 @@ class User(AbstractUser):
         choices=[(value, value) for value in RANGES],
         default="day",
     )
-    # The dashboard's selected site as a plain name string, not an FK: the
-    # value may legitimately not match any Host row (e.g. the demo account's
-    # displayed "counter.dev" name), so a FK would reject it.
-    selected_site = models.CharField(max_length=253, blank=True, default="")
+    # The dashboard's selected site. Null means "no site selected"; deleting
+    # the Host clears the selection automatically (SET_NULL).
+    selected_site = models.ForeignKey(
+        "core.Host",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )

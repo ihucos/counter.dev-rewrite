@@ -51,7 +51,7 @@ class TestAccountUpdate:
         assert resp.status_code == 400
 
     def test_absent_fields_keep_their_value(self, client, user, host):
-        user.selected_site = "example.com"
+        user.selected_site = host
         user.date_range = "last30"
         user.save()
         client.force_login(user)
@@ -64,16 +64,17 @@ class TestAccountUpdate:
         client.force_login(user)
         assert client.put("/account", {"site": "example.com", "range": "last30"}, content_type="application/json").status_code == 200
         user.refresh_from_db()
-        assert user.selected_site == "example.com"
+        assert user.selected_site == host
         assert user.date_range == "last30"
 
     def test_sites_sync_clears_dangling_selection(self, client, user, host):
-        user.selected_site = "remove-me.com"
+        other = Host.objects.create(user=user, name="remove-me.com")
+        user.selected_site = other
         user.save()
         client.force_login(user)
         assert client.put("/account", {"sites": "example.com"}, content_type="application/json").status_code == 200
         user.refresh_from_db()
-        assert user.selected_site == ""
+        assert user.selected_site is None
 
 
 class TestDeleteSite:
@@ -91,12 +92,12 @@ class TestDeleteSite:
         assert client.delete("/sites/missing.com").status_code == 404
 
     def test_delete_clears_selection(self, client, user, host, counts):
-        user.selected_site = "example.com"
+        user.selected_site = host
         user.save()
         client.force_login(user)
         assert client.delete("/sites/example.com").status_code == 204
         user.refresh_from_db()
-        assert user.selected_site == ""
+        assert user.selected_site is None
 
 
 class TestShareToken:
