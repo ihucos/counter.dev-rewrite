@@ -356,15 +356,8 @@
         checkPosition();
         // Tabs
         $(".tabs").tabslet();
-        // Modal
-
-        $('a[rel="modal:open"]').click(function (event) {
-          $(this).modal({
-            fadeDuration: 200,
-            fadeDelay: 0,
-          });
-          return false;
-        });
+        // Modal openers are bound in utils.js, delegated so they also reach
+        // links inside dynamically injected components.
 
         // Confirm deletion
         $(".btn-confirm").click(function () {

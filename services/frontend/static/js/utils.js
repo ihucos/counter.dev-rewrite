@@ -24,6 +24,17 @@ function apiUrl(url) {
     return url.charAt(0) === "/" ? apiBase() + url : url;
 }
 
+// Modal openers are bound delegated at document level: most rel="modal:open"
+// links live inside components injected after page load (navbar, settings),
+// which a ready-time binding never reaches.
+$(document).on("click", 'a[rel="modal:open"]', function (event) {
+    $(this).modal({
+        fadeDuration: 200,
+        fadeDelay: 0,
+    });
+    return false;
+});
+
 function simpleForm(formSelector, arg) {
     var success, formEl;
     if (typeof arg === "function") {

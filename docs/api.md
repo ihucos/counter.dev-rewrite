@@ -22,6 +22,12 @@ Sign in.
 
 On success the session cookie is set.
 
+### GET /logout
+
+Sign out. Ends the session and redirects the browser to `/welcome.html` on
+the origin it came from (the navbar links here directly), defaulting to
+`https://counter.dev/welcome.html` when no referer is present.
+
 ### POST /register
 
 Create an account.

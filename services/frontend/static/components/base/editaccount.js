@@ -113,7 +113,9 @@ customElements.define(
 
             var sites = prefs.sites || "";
             var mail = prefs.mail || "";
-            var useSites = prefs.usesites || "";
+            // prefs.usesites is a boolean from the backend; the select wants
+            // "" (show all traffic) or "1" (limit listed domains).
+            var useSites = prefs.usesites ? "1" : "";
             var sitesEl = this.querySelector('textarea[name="sites"]');
             var useSitesEl = this.querySelector('select[name="usesites"]');
             var mailEl = this.querySelector('input[name="mail"]');

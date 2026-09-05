@@ -4,14 +4,14 @@ import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db.models import Sum
 from django.http import HttpResponse, HttpResponseBadRequest, StreamingHttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -256,6 +256,21 @@ def login_view(request):
         return _error("wrong password")
     login(request, account)
     return _plain("ok")
+
+
+@csrf_exempt
+def logout_view(request):
+    """End the session. Reached via the navbar's plain "Sign out" link, so
+    accept GET and send the browser back to the SPA it came from."""
+    if request.user.is_authenticated:
+        logout(request)
+    referer = request.headers.get("referer", "")
+    try:
+        parts = urlparse(referer)
+        origin = f"{parts.scheme}://{parts.netloc}" if parts.netloc else ""
+    except ValueError:
+        origin = ""
+    return redirect(f"{origin or 'https://counter.dev'}/welcome.html")
 
 
 @csrf_exempt

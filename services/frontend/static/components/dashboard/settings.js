@@ -60,11 +60,14 @@ customElements.define(
                 </div>
               </div>`;
 
-            $(`#modal-settings .btn-confirm`).click(function () {
-                $(`#modal-settings .delete-request`).hide();
-                $(`#modal-settings .delete-confirm`).show();
-                $(`#modal-settings .danger`).toggleClass("gradient-red bg-blue");
-                $(`#modal-settings .confirm-input`).focus();
+            // Act via closest() so the handler keeps working on whichever modal copy
+            // is on screen, even after the component redraws itself.
+            $(this).find(".btn-confirm").click(function () {
+                var danger = $(this).closest(".danger");
+                danger.find(".delete-request").hide();
+                danger.find(".delete-confirm").show();
+                danger.toggleClass("gradient-red bg-blue");
+                danger.find(".confirm-input").focus();
             });
 
             // redraw modal if it is closed
@@ -73,7 +76,7 @@ customElements.define(
                 parentThis.draw(opts);
             });
 
-            simpleForm("#site-delete", "/dashboard");
+            simpleForm(this.querySelector("#site-delete"), "/dashboard.html");
 
             let tc = this.querySelector("counter-trackingcode");
             customElements.upgrade(tc);

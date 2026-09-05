@@ -179,9 +179,9 @@ Let's hope this madness stops eventually and things become more normal.
                      <div class="has-user dropdown" style="display: none">
                        <div class="profile-user fill-username"></div>
                        <div class="dropdown-content">
-                         <a href="/dashboard">Dashboard</a>
+                         <a href="/dashboard.html">Dashboard</a>
                          <a href="#modal-account" rel="modal:open">Edit account</a>
-                         <a href="/logout">Sign out</a>
+                         <a href="${apiUrl("/logout")}">Sign out</a>
                        </div>
                      </div>
                      <span class="no-user profile-guest" style="display: none">
@@ -215,12 +215,12 @@ Let's hope this madness stops eventually and things become more normal.
                                  onClick="document.getElementById('hamburger-toggle').checked=false"
                                  >Edit account</a
                                >
-                               <a href="/logout" class="btn-secondary">Sign out</a>
+                               <a href="${apiUrl("/logout")}" class="btn-secondary">Sign out</a>
                              </div>
                            </div>
                            <!-- /// -->
                            <a href="/blog" class="mb24">Blog</a>
-                           <a href="/dashboard" class="has-user mb24" target="_blank" rel="nofollow" style="display: none">
+                           <a href="/dashboard.html" class="has-user mb24" target="_blank" rel="nofollow" style="display: none">
                              Dashboard
                            </a>
                            <a href="mailto:hey@counter.dev" class="mb24" target="_blank" rel="nofollow"

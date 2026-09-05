@@ -9,6 +9,7 @@ from . import views
 urlpatterns = [
     # Authentication & account
     path("login", api.login_view, name="login"),
+    path("logout", api.logout_view, name="logout"),
     path("register", api.register_view, name="register"),
     path("recover", api.recover_view, name="recover"),
     path("account_edit", api.account_edit_view, name="account_edit"),

@@ -108,3 +108,21 @@ class TestFeedbackView:
         assert len(mail.outbox) == 1
         assert "great tool" in mail.outbox[0].body
         assert "me@example.com" in mail.outbox[0].body
+
+class TestLogoutView:
+    def test_logout_ends_the_session(self, client, user):
+        client.force_login(user)
+        resp = client.get("/logout", HTTP_REFERER="http://counterdev.test/dashboard.html")
+        assert resp.status_code == 302
+        assert resp["Location"] == "http://counterdev.test/welcome.html"
+        resp = client.post("/reset_token")
+        assert resp.status_code == 403  # session is gone
+
+    def test_logout_without_referer_falls_back_to_production(self, client, user):
+        client.force_login(user)
+        resp = client.get("/logout")
+        assert resp["Location"] == "https://counter.dev/welcome.html"
+
+    def test_logout_when_not_signed_in(self, client):
+        resp = client.get("/logout", HTTP_REFERER="http://counterdev.test/")
+        assert resp.status_code == 302
