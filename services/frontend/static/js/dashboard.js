@@ -64,29 +64,29 @@ connectData("dashboard-download", (dump) => [dump.sites[selector.site].visits[se
 // The tracking code keys on the username: the tracker buckets visits under
 // the data-id it is given, sync.py maps that id to the account and the
 // dashboard reads visit logs from log:<site>:<username>.
-connectData("counter-trackingcode", (dump) => [dump.user.id, dump.user.prefs.utcoffset || getUTCOffset()]);
+connectData("counter-trackingcode", (dump) => [dump.user.id, dump.user.timezone || getUTCOffset()]);
 
-connectData("dashboard-dynamics", (dump) => [dump.sites[selector.site].visits[selector.range]["date"], dump.user.prefs.utcoffset || getUTCOffset()]);
+connectData("dashboard-dynamics", (dump) => [dump.sites[selector.site].visits[selector.range]["date"], dump.user.timezone || getUTCOffset()]);
 
-connectData("dashboard-graph", (dump) => [dump.sites[selector.site].visits[selector.range]["date"], dump.sites[selector.site].visits[selector.range]["hour"], dump.user.prefs.utcoffset || getUTCOffset(), selector.range]);
+connectData("dashboard-graph", (dump) => [dump.sites[selector.site].visits[selector.range]["date"], dump.sites[selector.site].visits[selector.range]["hour"], dump.user.timezone || getUTCOffset(), selector.range]);
 
 connectData("dashboard-settings", (dump) => [
     {
         cursite: selector.site,
         id: dump.user.id,
         meta: dump.meta,
-        utcoffset: dump.user.prefs.utcoffset || getUTCOffset(),
+        utcoffset: dump.user.timezone || getUTCOffset(),
     },
 ]);
 
 connectData("dashboard-counter-visitors", (dump) => [
     dump.sites[selector.site].visits,
     selector.range,
-    dump.user.prefs.utcoffset || getUTCOffset(), // getUTCOffset() is a fallback for older users
+    dump.user.timezone || getUTCOffset(), // getUTCOffset() is a fallback for older users
 ]);
-connectData("dashboard-counter-search", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.prefs.utcoffset || getUTCOffset()]);
-connectData("dashboard-counter-social", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.prefs.utcoffset || getUTCOffset()]);
-connectData("dashboard-counter-direct", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.prefs.utcoffset || getUTCOffset()]);
+connectData("dashboard-counter-search", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.timezone || getUTCOffset()]);
+connectData("dashboard-counter-social", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.timezone || getUTCOffset()]);
+connectData("dashboard-counter-direct", (dump) => [dump.sites[selector.site].visits, selector.range, dump.user.timezone || getUTCOffset()]);
 connectData("#devices dashboard-pie", k("device"));
 connectData("#platforms dashboard-pie ", k("platform"));
 connectData("#browsers dashboard-pie", k("browser"));
@@ -188,17 +188,17 @@ function currentSite() {
     if (select && names.includes(select.value)) {
         return select.value;
     }
-    const pref = window.dump.user.prefs.site;
+    const pref = window.dump.user.selected_site;
     return names.includes(pref) ? pref : names[0];
 }
 
 function currentRange() {
     const select = document.getElementById("range-select");
-    return (select && select.value) || window.dump.user.prefs.range || "day";
+    return (select && select.value) || window.dump.user.date_range || "day";
 }
 
 function currentUTCOffset() {
-    return window.dump.user.prefs.utcoffset || getUTCOffset();
+    return window.dump.user.timezone || getUTCOffset();
 }
 
 async function fetchQuery(displaySite, range) {
@@ -272,7 +272,7 @@ document.addEventListener("redraw", () => redraw());
 // The site/range selectors announce their changes; the dashboard then
 // fetches the affected data and redraws.
 async function onStateChanged() {
-    window.dump.user.prefs.range = currentRange();
+    window.dump.user.date_range = currentRange();
     if (currentRange() !== "daterange") {
         const loaded = await loadRange(currentRange());
         if (!loaded) return;
@@ -339,7 +339,7 @@ async function boot() {
         sites: Object.fromEntries(displaySiteNames().map((name) => [name, { visits: {}, logs: [] }])),
     };
     if (me.meta.demo) {
-        window.dump.user.prefs.site = "counter.dev";
+        window.dump.user.selected_site = "counter.dev";
     }
 
     const loaded = await loadRange(currentRange());

@@ -25,8 +25,8 @@ customElements.define(
             }
             this.last_sites = sites;
 
-            var sitePref = dump.user.prefs.site;
-            var rangePref = dump.user.prefs.range;
+            var sitePref = dump.user.selected_site;
+            var rangePref = dump.user.date_range;
 
             this.style.display = "flex";
 
@@ -64,8 +64,8 @@ customElements.define(
 
             // request change up in the cloud and then also apply that change down
             // here in the client
-            this.putPrefs({ site: this.site });
-            this.dump.user.prefs.site = this.site;
+            this.putPrefs({ selected_site: this.site });
+            this.dump.user.selected_site = this.site;
 
             document.dispatchEvent(new Event("dashboard-state-changed"));
         }
@@ -79,9 +79,9 @@ customElements.define(
             // request change up in the cloud and then also apply that change down
             // here in the client
             if (this.range != "daterange") {
-                this.putPrefs({ range: this.range });
+                this.putPrefs({ date_range: this.range });
             }
-            this.dump.user.prefs.range = this.range;
+            this.dump.user.date_range = this.range;
             document.dispatchEvent(new Event("dashboard-state-changed"));
         }
 

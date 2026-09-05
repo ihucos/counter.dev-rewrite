@@ -1,7 +1,7 @@
 customElements.define(
     tagName(),
     class extends HTMLElement {
-        draw(prefs) {
+        draw(user) {
             this.innerHTML = `
 
                 <!-- Edit account modal -->
@@ -15,7 +15,7 @@ customElements.define(
                     <!-- Time zone -->
                     <div class="title mb16">Time Zone</div>
                     <form action="/account" id="account-edit" method="PUT">
-                        <select class="width-full" name="utcoffset">
+                        <select class="width-full" name="timezone">
                           ${this.TIMEZONES.map((i) => `<option value="${escapeHtml(i[0])}">${escapeHtml(i[1])}</option>`).join("")}
                         </select>
                         <!-- Change password -->
@@ -46,7 +46,7 @@ customElements.define(
                         <!-- Mail -->
                         <div class="title mb8 mt24">Recover account</div>
                         <input
-                            name="mail"
+                            name="email"
                             class="width-full"
                             type="email"
                             placeholder="Trusted E-Mail"
@@ -54,11 +54,11 @@ customElements.define(
                         <!-- Whitelist domains -->
                         <div class="title mb16 mt24">Listed Domains</div>
 
-                            <select class="width-full" name="usesites">
-                                  <option value="">
+                            <select class="width-full" name="use_sites">
+                                  <option value="false">
                                     Show all incoming traffic
                                   </option>
-                                  <option value="1">
+                                  <option value="true">
                                     Limit listed domains
                                   </option>
                             </select>
@@ -105,27 +105,37 @@ customElements.define(
                   </div>
                 </div>`;
 
-            var utcoffset = prefs.utcoffset || getUTCOffset();
+            var utcoffset = user.timezone || getUTCOffset();
 
             if (!isNaN(utcoffset)) {
                 this.querySelector(`option[value="${utcoffset}"]`).setAttribute("selected", "selected");
             }
 
-            var sites = prefs.sites || "";
-            var mail = prefs.mail || "";
-            // prefs.usesites is a boolean from the backend; the select wants
-            // "" (show all traffic) or "1" (limit listed domains).
-            var useSites = prefs.usesites ? "1" : "";
+            var mail = user.email || "";
+            // user.use_sites is a boolean from the backend; the select sends
+            // "true" (limit listed domains) or "false" (show all traffic).
+            var useSites = user.use_sites ? "true" : "false";
             var sitesEl = this.querySelector('textarea[name="sites"]');
-            var useSitesEl = this.querySelector('select[name="usesites"]');
-            var mailEl = this.querySelector('input[name="mail"]');
+            var useSitesEl = this.querySelector('select[name="use_sites"]');
+            var mailEl = this.querySelector('input[name="email"]');
 
             useSitesEl.value = useSites;
-            sitesEl.value = sites;
             mailEl.value = mail;
 
+            // The listed domains live on the Host rows now; fetch them from
+            // the sites resource instead of prefs. Keep the current list so
+            // saving can diff it against the textarea (sites are managed
+            // through the /sites resource, not PUT /account).
+            var currentSites = [];
+            fetch(apiUrl("/sites") + (new URLSearchParams(window.location.search).toString() ? "?" + new URLSearchParams(window.location.search).toString() : ""), { credentials: "include" })
+                .then((resp) => (resp.ok ? resp.json() : []))
+                .then((sites) => {
+                    currentSites = sites.map((s) => s.name);
+                    sitesEl.value = currentSites.join("\n");
+                });
+
             let showHidePrefferedSites = function () {
-                if (useSitesEl.value === "") {
+                if (useSitesEl.value === "false") {
                     slideHide(sitesEl.parentElement);
                 } else {
                     slideShow(sitesEl.parentElement);
@@ -145,12 +155,55 @@ customElements.define(
                 this.querySelector(".confirm-input").focus();
             };
 
-            simpleForm("#account-edit", window.location.href.split("#")[0]);
+            // Save: PUT /account for the account fields, then sync the textarea's
+            // domains against the current /sites list (POST new, DELETE gone).
+            this.querySelector("#account-edit").onsubmit = function (evt) {
+                evt.preventDefault();
+                var body = new URLSearchParams(new FormData(evt.target));
+                body.delete("sites");
+                fetch(apiUrl("/account"), {
+                    method: "PUT",
+                    body: body,
+                    credentials: "include",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                }).then(async function (resp) {
+                    if (!resp.ok) {
+                        notify(await resp.text());
+                        return;
+                    }
+                    var desired = sitesEl.value.split(/[\s,]+/).filter(function (s) { return s; });
+                    var add = desired.filter(function (name) { return currentSites.indexOf(name) === -1; });
+                    var remove = currentSites.filter(function (name) { return desired.indexOf(name) === -1; });
+                    var ops = add.map(function (name) {
+                        return fetch(apiUrl("/sites"), {
+                            method: "POST",
+                            credentials: "include",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ name: name }),
+                        });
+                    }).concat(remove.map(function (name) {
+                        return fetch(apiUrl("/sites/") + encodeURIComponent(name), {
+                            method: "DELETE",
+                            credentials: "include",
+                        });
+                    }));
+                    Promise.all(ops).then(function (results) {
+                        var failed = results.find(function (r) { return !r.ok; });
+                        if (failed) {
+                            notify("Saving the listed domains failed");
+                            return;
+                        }
+                        window.location.href = window.location.href.split("#")[0];
+                    });
+                });
+                return false;
+            };
+
             simpleForm(".delete-account .delete-confirm", "/");
 
             // redraw modal if it is closed
             this.querySelector("#modal-account").addEventListener("modal-after-close", () => {
-                this.draw(prefs);
+                this.draw(user);
             });
         }
 

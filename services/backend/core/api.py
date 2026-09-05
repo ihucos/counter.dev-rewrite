@@ -44,6 +44,7 @@ from .serializers import (
     RecoverSerializer,
     RegisterSerializer,
     SubscribedSerializer,
+    _normalize_domain,
 )
 
 User = get_user_model()
@@ -59,7 +60,10 @@ class UserStateSerializer(Serializer):
     id = serializers.CharField()
     uuid = serializers.CharField(allow_blank=True)
     token = serializers.CharField(allow_blank=True)
-    prefs = serializers.JSONField()
+    email = serializers.CharField(allow_blank=True)
+    selected_site = serializers.CharField(allow_blank=True)
+    date_range = serializers.CharField()
+    use_sites = serializers.BooleanField()
     timezone = serializers.IntegerField()
 
 
@@ -138,13 +142,6 @@ def _local_date(utcoffset_hours):
     """
     utcoffset_hours = max(-12, min(14, utcoffset_hours))
     return (timezone.now() + timedelta(hours=utcoffset_hours)).date()
-
-
-def _normalize_domain(value):
-    for prefix in ["https://", "http://", "www."]:
-        if value.startswith(prefix):
-            value = value[len(prefix):]
-    return value.rstrip("/")
 
 
 def _query_site_data(host: Host, start: date, end: date) -> dict[str, dict[str, int]]:
@@ -427,10 +424,8 @@ def subscribed_view(request):
     serializer.is_valid(raise_exception=True)
     if not request.user.is_authenticated:
         raise NotAuthenticated()
-    prefs = dict(request.user.prefs or {})
-    prefs["subscription_id"] = serializer.validated_data["subscription_id"]
-    request.user.prefs = prefs
-    request.user.save(update_fields=["prefs"])
+    request.user.subscription_id = serializer.validated_data["subscription_id"]
+    request.user.save(update_fields=["subscription_id"])
     return Response({"ok": True})
 
 
@@ -459,14 +454,10 @@ class AccountViewSet(ViewSet):
     def list(self, request):
         """The signed-in user's state: user record and session meta.
 
-        Feeds session bootstrap and the share-account panel. selected_site
-        and date_range are promoted User columns, but surface inside prefs so
-        the SPA keeps reading one prefs dict.
+        Feeds session bootstrap and the share-account panel. The field names
+        are the User model's columns; selected_site is the site's name.
         """
         user = request.user
-        prefs = dict(user.prefs or {})
-        prefs["site"] = user.selected_site.name if user.selected_site else ""
-        prefs["range"] = user.date_range
         return Response(
             AccountResponseSerializer(
                 {
@@ -474,7 +465,10 @@ class AccountViewSet(ViewSet):
                         "id": user.username,
                         "uuid": str(user.uuid) if user.uuid else "",
                         "token": user.share_token,
-                        "prefs": prefs,
+                        "email": user.email,
+                        "selected_site": user.selected_site.name if user.selected_site else "",
+                        "date_range": user.date_range,
+                        "use_sites": user.use_sites,
                         "timezone": user.timezone,
                     },
                     "meta": {
@@ -488,43 +482,14 @@ class AccountViewSet(ViewSet):
 
     @extend_schema(request=AccountUpdateSerializer, responses=OkResponseSerializer)
     def update(self, request):
-        """Update email, timezone, the sites list and the dashboard prefs
-        (selected site / date range). Absent fields keep their value: the
-        SPA's selectors PUT site or range alone."""
-        serializer = AccountUpdateSerializer(data=request.data)
+        """Update account fields (User columns) — email, timezone, use_sites and
+        the dashboard selection (selected site / date range). Absent fields
+        keep their value: the SPA's selectors PUT selected_site or
+        date_range alone. Sites themselves are the one-to-many /sites
+        resource."""
+        serializer = AccountUpdateSerializer(request.user, data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        user = request.user
-
-        if "utcoffset" in data:
-            user.timezone = data["utcoffset"]
-        if "mail" in data:
-            user.email = data["mail"]
-        if "usesites" in data:
-            prefs = dict(user.prefs or {})
-            prefs["usesites"] = data["usesites"]
-            user.prefs = prefs
-        if "sites" in data:
-            names = [_normalize_domain(s.strip()) for s in data["sites"].splitlines() if s.strip()]
-            existing = {h.name: h for h in Host.objects.filter(user=user)}
-            for name in names:
-                if name not in existing:
-                    Host.objects.create(user=user, name=name)
-            for name, host in existing.items():
-                if name not in names:
-                    host.delete()  # SET_NULL clears selected_site in the DB
-                    # Keep the in-memory user consistent so the save below
-                    # doesn't resurrect the deleted selection.
-                    if user.selected_site_id == host.pk:
-                        user.selected_site_id = None
-        if "site" in data:
-            name = _normalize_domain(data["site"].strip())
-            user.selected_site = (
-                Host.objects.filter(user=user, name=name).first() if name else None
-            )
-        if "range" in data:
-            user.date_range = data["range"]
-        user.save()
+        serializer.save()
         return Response({"ok": True})
 
     @extend_schema(request=None, responses=OkResponseSerializer)
@@ -558,6 +523,15 @@ class HostSerializer(ModelSerializer):
         model = Host
         fields = ["name", "hide"]
 
+    def validate_name(self, value):
+        name = _normalize_domain(value.strip())
+        if not name:
+            raise ValidationError({"name": "name must not be empty"})
+        user = self.context["request"].user
+        if Host.objects.filter(user=user, name=name).exclude(pk=getattr(self.instance, "pk", None)).exists():
+            raise ValidationError({"name": "you already have that site"})
+        return name
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -571,8 +545,8 @@ class HostSerializer(ModelSerializer):
 class SiteViewSet(ModelViewSet):
     """The sites a user has, in name order.
 
-    Only reads and destroy are enabled: sites are created and edited via the
-    account's sites list (PUT /account), so there is no POST/PUT here. The
+    Full CRUD on the user->sites one-to-many (Host) relation: POST adds a
+    site, PUT/PATCH edits it (e.g. the hide flag), DELETE removes it. The
     list response is the source of truth for which sites an account has
     (setup-vs-dashboard routing and the site selector). The
     AccountAuthentication above resolves sessions, guest/share access and
@@ -587,10 +561,12 @@ class SiteViewSet(ModelViewSet):
     # default lookup regex (which excludes dots) is widened.
     lookup_field = "name"
     lookup_value_regex = "[^/]+"
-    http_method_names = ["get", "delete"]
 
     def get_queryset(self):
         return _sites_for(self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     def perform_destroy(self, instance):
         # Deleting the selected site clears user.selected_site via SET_NULL.

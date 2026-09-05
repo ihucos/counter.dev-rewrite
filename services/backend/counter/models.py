@@ -12,8 +12,11 @@ class User(AbstractUser):
     # Whole hours, matching the tracking script's data-utcoffset and the
     # tracker's clamping (-12..14).
     timezone = models.IntegerField(default=0, help_text="UTC offset in hours")
-    prefs = models.JSONField(default=dict, blank=True)
+    subscription_id = models.CharField(max_length=64, blank=True, default="")
     hide_hosts = models.BooleanField(default=False)
+    # "Limit listed domains": when true, only the Host rows count as the
+    # account's sites; when false, all incoming traffic is shown.
+    use_sites = models.BooleanField(default=False)
     share_token = models.CharField(max_length=64, blank=True, default="")
     date_range = models.CharField(
         max_length=16,

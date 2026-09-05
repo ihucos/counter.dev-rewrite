@@ -69,28 +69,27 @@ class TestAccountUpdate:
         client.force_login(user)
         resp = client.put(
             "/account",
-            {"utcoffset": -60, "usesites": "true", "sites": "example.com\nwww.foo.bar/", "mail": "a@b.c"},
+            {"timezone": -60, "use_sites": "true", "email": "a@b.c"},
             content_type="application/json",
         )
         assert resp.status_code == 200
         user.refresh_from_db()
         assert user.timezone == -60
         assert user.email == "a@b.c"
-        assert user.prefs["usesites"] is True
-        names = sorted(Host.objects.filter(user=user).values_list("name", flat=True))
-        assert names == ["example.com", "foo.bar"]
+        assert user.use_sites is True
 
-    def test_account_update_removes_deleted_sites(self, client, user):
+    def test_account_create_site(self, client, user):
         client.force_login(user)
-        Host.objects.create(user=user, name="old.com")
-        resp = client.put("/account", {"utcoffset": 0, "usesites": "false", "sites": "new.com", "mail": ""}, content_type="application/json")
+        resp = client.put("/account", {"timezone": 0, "email": ""}, content_type="application/json")
         assert resp.status_code == 200
-        names = list(Host.objects.filter(user=user).values_list("name", flat=True))
-        assert names == ["new.com"]
+        resp = client.post("/sites", {"name": "www.foo.bar/"}, content_type="application/json")
+        assert resp.status_code == 201
+        names = sorted(Host.objects.filter(user=user).values_list("name", flat=True))
+        assert names == ["foo.bar"]
 
     def test_account_update_prefs(self, client, user, host):
         client.force_login(user)
-        resp = client.put("/account", {"site": "example.com", "range": "last7"}, content_type="application/json")
+        resp = client.put("/account", {"selected_site": "example.com", "date_range": "last7"}, content_type="application/json")
         assert resp.status_code == 200
         user.refresh_from_db()
         assert user.selected_site == host
@@ -98,7 +97,7 @@ class TestAccountUpdate:
 
     def test_account_update_invalid_range(self, client, user):
         client.force_login(user)
-        assert client.put("/account", {"range": "nope"}, content_type="application/json").status_code == 400
+        assert client.put("/account", {"date_range": "nope"}, content_type="application/json").status_code == 400
 
 
 class TestDeleteAccount:
@@ -155,14 +154,16 @@ class TestShareToken:
         assert user.share_token == ""
 
 
-class TestPrefs:
-    def test_account_returns_promoted_prefs(self, client, user, host):
+class TestAccountState:
+    def test_account_returns_promoted_state(self, client, user, host):
         client.force_login(user)
         user.selected_site = host
         user.date_range = "last7"
         user.save()
         body = client.get("/account").json()
-        assert body["user"]["prefs"] == {"site": "example.com", "range": "last7"}
+        assert body["user"]["selected_site"] == "example.com"
+        assert body["user"]["date_range"] == "last7"
+        assert body["user"]["use_sites"] is False
 
 
 class TestAccount:
@@ -176,7 +177,9 @@ class TestAccount:
         body = json.loads(resp.content)
         assert body["user"]["id"] == "testuser"
         assert body["user"]["uuid"] == str(user.uuid)
-        assert body["user"]["prefs"] == {"site": "", "range": "day"}
+        assert body["user"]["selected_site"] == ""
+        assert body["user"]["date_range"] == "day"
+        assert body["user"]["use_sites"] is False
         assert body["user"]["timezone"] == 0
         assert body["meta"] == {"utcoffset": 60, "sessionless": False, "demo": False}
 
@@ -309,9 +312,9 @@ class TestSites:
 
     def test_sites_write_methods(self, client, user, host):
         client.force_login(user)
-        # Sites are created and edited via PUT /account, not this resource.
-        assert client.post("/sites", {"name": "nope.com"}).status_code == 405
-        assert client.put("/sites/example.com", {"name": "x"}).status_code == 405
+        # The sites resource is full CRUD on the user->sites relation.
+        assert client.post("/sites", {"name": "nope.com"}).status_code == 201
+        assert client.put("/sites/example.com", {"name": "example.com"}, content_type="application/json").status_code == 200
         assert client.delete("/sites/example.com").status_code == 204
 
 
@@ -333,10 +336,10 @@ class TestMisc:
         resp = client.post("/subscribed", json.dumps({"subscription_id": "P-123"}), content_type="application/json")
         assert resp.status_code == 200
         user.refresh_from_db()
-        assert user.prefs["subscription_id"] == "P-123"
+        assert user.subscription_id == "P-123"
 
     def test_subscribed_form(self, client, user):
         client.force_login(user)
         assert client.post("/subscribed", {"subscription_id": "P-456"}).status_code == 200
         user.refresh_from_db()
-        assert user.prefs["subscription_id"] == "P-456"
+        assert user.subscription_id == "P-456"

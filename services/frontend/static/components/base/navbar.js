@@ -35,13 +35,13 @@ customElements.define(
                 this.eventPushNavbarDumpCalled = true;
                 this.hasUser(me.user.id);
                 sessionStorage.setItem(usernameCacheKey, me.user.id);
-                // the fallback is because older user's dont set the
-                // utcoffset by default
-                this.drawEditaccount(me.user.prefs);
+                // The edit-account modal reads everything off the user record now
+                // (timezone, mail, use_sites); no prefs dict exists anymore.
+                this.drawEditaccount(me.user);
 
                 // Adapt the feedback form mail input field
-                if (me.user.prefs.mail) {
-                    document.getElementById("feedback-mail").setAttribute("value", me.user.prefs.mail);
+                if (me.user.email) {
+                    document.getElementById("feedback-mail").setAttribute("value", me.user.email);
                     document.getElementById("feedback-mail").setAttribute("type", "hidden");
                 }
 

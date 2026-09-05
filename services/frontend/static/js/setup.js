@@ -19,10 +19,10 @@ async function boot() {
     customElements.whenDefined("counter-trackingcode").then(() => {
         let el = document.querySelector("counter-trackingcode");
         // The tracking code keys on the username (see dashboard.js).
-        el.draw(me.user.id, me.user.prefs.utcoffset || getUTCOffset());
+        el.draw(me.user.id, me.user.timezone || getUTCOffset());
     });
     const username = me.user.id;
-    const utcoffset = me.user.prefs.utcoffset || getUTCOffset();
+    const utcoffset = me.user.timezone || getUTCOffset();
     document.getElementById("test-visit").onclick = async function (evt) {
         evt.preventDefault();
         await triggerTestVisit(username, utcoffset);

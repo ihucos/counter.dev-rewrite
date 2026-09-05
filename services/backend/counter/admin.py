@@ -24,7 +24,7 @@ class UserAdmin(BaseUserAdmin):
                 "fields": (
                     "uuid",
                     "timezone",
-                    "prefs",
+                    "subscription_id",
                     "hide_hosts",
                 )
             },

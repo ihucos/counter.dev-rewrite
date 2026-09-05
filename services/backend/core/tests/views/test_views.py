@@ -7,7 +7,8 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from core.models import Host
-from core.api import parse_log_line, _normalize_domain
+from core.api import parse_log_line
+from core.serializers import _normalize_domain
 
 User = get_user_model()
 
@@ -18,36 +19,27 @@ class TestAccountUpdate:
     def test_requires_auth(self, client):
         assert client.put("/account").status_code == 401
 
-    def test_updates_account_and_sites(self, client, user, host):
-        other = Host.objects.create(user=user, name="remove-me.com")
+    def test_updates_account(self, client, user, host):
         client.force_login(user)
         resp = client.put(
             "/account",
-            {
-                "utcoffset": "-2",
-                "usesites": "true",
-                "mail": "new@example.com",
-                "sites": "example.com\nhttps://www.newsite.org/\n",
-            },
+            {"timezone": "-2", "use_sites": "true", "email": "new@example.com"},
             content_type="application/json",
         )
         assert resp.status_code == 200
         user.refresh_from_db()
         assert user.timezone == -2
         assert user.email == "new@example.com"
-        assert user.prefs["usesites"] is True
-        names = set(Host.objects.filter(user=user).values_list("name", flat=True))
-        assert names == {"example.com", "newsite.org"}
-        assert not Host.objects.filter(pk=other.pk).exists()
+        assert user.use_sites is True
 
     def test_invalid_utcoffset(self, client, user):
         client.force_login(user)
-        resp = client.put("/account", {"utcoffset": "nope"}, content_type="application/json")
+        resp = client.put("/account", {"timezone": "nope"}, content_type="application/json")
         assert resp.status_code == 400
 
     def test_invalid_range(self, client, user):
         client.force_login(user)
-        resp = client.put("/account", {"range": "bogus"}, content_type="application/json")
+        resp = client.put("/account", {"date_range": "bogus"}, content_type="application/json")
         assert resp.status_code == 400
 
     def test_absent_fields_keep_their_value(self, client, user, host):
@@ -55,26 +47,45 @@ class TestAccountUpdate:
         user.date_range = "last30"
         user.save()
         client.force_login(user)
-        assert client.put("/account", {"site": "example.com"}, content_type="application/json").status_code == 200
+        assert client.put("/account", {"selected_site": "example.com"}, content_type="application/json").status_code == 200
         user.refresh_from_db()
         assert user.date_range == "last30"
         assert user.timezone == 0
 
     def test_updates_selected_site_and_range(self, client, user, host):
         client.force_login(user)
-        assert client.put("/account", {"site": "example.com", "range": "last30"}, content_type="application/json").status_code == 200
+        assert client.put("/account", {"selected_site": "example.com", "date_range": "last30"}, content_type="application/json").status_code == 200
         user.refresh_from_db()
         assert user.selected_site == host
         assert user.date_range == "last30"
 
-    def test_sites_sync_clears_dangling_selection(self, client, user, host):
-        other = Host.objects.create(user=user, name="remove-me.com")
-        user.selected_site = other
-        user.save()
+
+class TestCreateSite:
+    def test_requires_auth(self, client):
+        assert client.post("/sites", {"name": "new.com"}).status_code == 401
+
+    def test_creates_site(self, client, user):
         client.force_login(user)
-        assert client.put("/account", {"sites": "example.com"}, content_type="application/json").status_code == 200
-        user.refresh_from_db()
-        assert user.selected_site is None
+        resp = client.post("/sites", {"name": "https://www.newsite.org/"}, content_type="application/json")
+        assert resp.status_code == 201
+        assert Host.objects.filter(user=user, name="newsite.org").exists()
+
+    def test_duplicate_site(self, client, user, host):
+        client.force_login(user)
+        resp = client.post("/sites", {"name": "example.com"}, content_type="application/json")
+        assert resp.status_code == 400
+
+    def test_empty_name(self, client, user):
+        client.force_login(user)
+        resp = client.post("/sites", {"name": "https://"}, content_type="application/json")
+        assert resp.status_code == 400
+
+    def test_update_site(self, client, user, host):
+        client.force_login(user)
+        resp = client.put("/sites/example.com", {"name": "example.com", "hide": "false"}, content_type="application/json")
+        assert resp.status_code == 200
+        host.refresh_from_db()
+        assert host.hide is False
 
 
 class TestDeleteSite:
@@ -151,7 +162,7 @@ class TestSubscribedView:
         client.force_login(user)
         assert client.post("/subscribed", {"subscription_id": "I-ABC123"}).status_code == 200
         user.refresh_from_db()
-        assert user.prefs["subscription_id"] == "I-ABC123"
+        assert user.subscription_id == "I-ABC123"
 
     def test_accepts_json_body(self, client, user):
         client.force_login(user)
@@ -162,7 +173,7 @@ class TestSubscribedView:
         )
         assert resp.status_code == 200
         user.refresh_from_db()
-        assert user.prefs["subscription_id"] == "I-JSON"
+        assert user.subscription_id == "I-JSON"
 
 
 class TestNewsletterRegisterView:
