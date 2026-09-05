@@ -184,7 +184,7 @@ customElements.define(
         }
 
         subscriptionSuccess(subscriptionID) {
-            $.post("/subscribed", { subscription_id: subscriptionID });
+            $.ajax({ type: "POST", url: apiUrl("/subscribed"), data: { subscription_id: subscriptionID }, xhrFields: { withCredentials: true } });
             $.modal.close();
             notify(`You are awesome. If you are not happy with the product or service let us know at any time.`);
         }

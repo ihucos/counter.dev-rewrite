@@ -23,7 +23,10 @@ Notes:
 # E2E tests
 
 Playwright tests in `e2e/tests/` run against the gateway on :80 under the
-local hostname http://counterdev. Only the gateway publishes a host port;
+local hostname http://counterdev.test; the SPA calls the API on
+http://api.counterdev.test with CORS (both are same-site under the
+two-label `.counterdev.test` base, so the session cookie flows over plain
+HTTP). Only the gateway publishes a host port;
 the frontend, backend and tracker are reachable only through it, routed by
 Host header (see [getting-started.md](getting-started.md)). The tests map
 the hostnames to 127.0.0.1 via Chromium host-resolver rules and an explicit

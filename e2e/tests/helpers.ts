@@ -1,13 +1,16 @@
 import { expect, type Page } from "@playwright/test";
 import { request as httpRequest } from "node:http";
 
-// The tracker is reached through the gateway as t.counterdev (the gateway
-// routes by Host header). We talk to 127.0.0.1 directly with an explicit
-// Host header, so /etc/hosts entries aren't required to run the suite. The
-// tracker records visits in Redis; the `sync` container moves them into
+// The tracker is reached through the gateway as t.counterdev.test (the
+// gateway routes by Host header). We talk to 127.0.0.1 directly with an
+// explicit Host header, so /etc/hosts entries aren't required to run the
+// suite. The tracker records visits in Redis; the `sync` container moves them into
 // Postgres (within a second), from where the dashboard's /dump endpoint
 // reads them.
-export const TRACKER_HOST = "t.counterdev";
+export const TRACKER_HOST = "t.counterdev.test";
+
+// The API lives on its own hostname, routed through the gateway.
+export const API_BASE = "http://api.counterdev.test";
 
 // A realistic desktop Chrome user agent — the tracker silently drops bot
 // user agents (including Playwright's default HeadlessChrome).
@@ -34,7 +37,7 @@ export async function signUp(page: Page, user: string, password = "hunter2secret
 
 // Add a site through the same endpoint the settings form posts to.
 export async function addSite(page: Page, site: string) {
-  const res = await page.request.post("/account_edit", {
+  const res = await page.request.post(`${API_BASE}/account_edit`, {
     form: { sites: `https://${site}`, utcoffset: "0" },
   });
   expect(res.status()).toBe(200);
@@ -101,9 +104,9 @@ type Dump = {
 // Returns null if the stream reports no signed-in user.
 export async function readFirstDump(page: Page, query = "utcoffset=0"): Promise<Dump | null> {
   return page.evaluate(
-    (q) =>
+    ([base, q]) =>
       new Promise((resolve, reject) => {
-        const es = new EventSource(`/dump?${q}`);
+        const es = new EventSource(`${base}/dump?${q}`, { withCredentials: true });
         const timeout = setTimeout(() => {
           es.close();
           reject(new Error("no dump event within 10s"));
@@ -117,7 +120,7 @@ export async function readFirstDump(page: Page, query = "utcoffset=0"): Promise<
           }
         };
       }),
-    query,
+    [API_BASE, query],
   );
 }
 

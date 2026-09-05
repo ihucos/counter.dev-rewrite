@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signUp, uniqueName } from "./helpers";
+import { API_BASE, signUp, uniqueName } from "./helpers";
 
 test("signing up lands on the setup page showing the new user", async ({ page }) => {
   const user = uniqueName();
@@ -69,7 +69,7 @@ test("the dashboard requires a session", async ({ page }) => {
 
 test("account recovery never reveals whether the account exists", async ({ request }) => {
   const mail = `e2e-${Date.now()}@example.com`;
-  const res = await request.post("/recover", { form: { user: "no-such-user", mail } });
+  const res = await request.post(`${API_BASE}/recover`, { form: { user: "no-such-user", mail } });
   expect(res.status()).toBe(200);
   await expect(res.text()).resolves.toBe("ok");
 });
@@ -78,7 +78,7 @@ test("deleting the account removes it", async ({ page }) => {
   const user = uniqueName();
   await signUp(page, user);
 
-  const res = await page.request.post("/delete_user");
+  const res = await page.request.post(`${API_BASE}/delete_user`);
   expect(res.status()).toBe(200);
 
   // The session is gone with the account.

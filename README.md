@@ -13,11 +13,11 @@ docker compose up   # from the repo root; gateway on :80 is the only published p
 
 | Service | URL |
 |---|---|
-| Frontend (site + dashboard) | http://counterdev |
-| Tracker (ingest) | http://t.counterdev |
-| Backend (API/admin) | http://api.counterdev |
+| Frontend (site + dashboard) | http://counterdev.test |
+| Tracker (ingest) | http://t.counterdev.test |
+| Backend (API/admin) | http://api.counterdev.test |
 
-Local and production hostnames mirror each other (`counterdev` ↔ `counter.dev`); anything else (including `localhost`) gets a rejection page pointing at the right names.
+Local and production hostnames mirror each other (`counterdev.test` ↔ `counter.dev`); anything else (including `localhost`) gets a rejection page pointing at the right names.
 
 ## What's inside
 

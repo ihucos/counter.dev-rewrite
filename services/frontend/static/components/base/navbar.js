@@ -76,7 +76,7 @@ customElements.define(
         }
 
         connectedCallback() {
-            fetch("/lang")
+            fetch(apiUrl("/lang"), { credentials: "include" })
                 .then((response) => response.text())
                 .then((response) => {
                     if (response == "RU") {

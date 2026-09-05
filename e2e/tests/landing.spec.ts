@@ -12,7 +12,7 @@ test("unknown hostnames are rejected with the counterdev promo page", async ({ p
   await page.goto("http://localhost/");
   await expect(page).toHaveTitle(/hostname required/);
   await expect(page.locator("table tr")).toHaveCount(4); // header + 3 services
-  await expect(page.locator("a[href='http://counterdev/']")).toBeVisible();
+  await expect(page.locator("a[href='http://counterdev.test/']")).toBeVisible();
 });
 
 test("static assets load", async ({ page }) => {

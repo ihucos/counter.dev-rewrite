@@ -68,7 +68,7 @@ customElements.define(
 
             // request change up in the cloud and then also apply that change down
             // here in the client
-            fetch("/set_pref_site?" + encodeURIComponent(this.site));
+            fetch(apiUrl("/set_pref_site?") + encodeURIComponent(this.site), { credentials: "include" });
             this.dump.user.prefs.site = this.site;
 
             document.dispatchEvent(
@@ -87,7 +87,7 @@ customElements.define(
             // request change up in the cloud and then also apply that change down
             // here in the client
             if (this.range != "daterange") {
-                fetch("/set_pref_range?" + encodeURIComponent(this.range));
+                fetch(apiUrl("/set_pref_range?") + encodeURIComponent(this.range), { credentials: "include" });
             }
             this.dump.user.prefs.range = this.range;
             document.dispatchEvent(

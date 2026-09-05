@@ -12,6 +12,6 @@ test("setup redirects anonymous visitors to the landing page", async ({ page }) 
 });
 
 test("unknown paths 404", async ({ request }) => {
-  const response = await request.get("/no-such-page.html");
+  const response = await request.get("http://counterdev.test/no-such-page.html");
   expect(response.status()).toBe(404);
 });

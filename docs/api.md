@@ -1,7 +1,10 @@
 # API
 
-All endpoints are same-origin relative URLs (no separate API host). Authentication
-is a session cookie managed by the server. Guest/share access to a dashboard uses
+All endpoints are served by the backend behind `api.counter.dev` (locally
+`api.counterdev`). The SPA resolves the API host at runtime via `apiBase()` in
+`static/js/utils.js`, and the backend's `CorsMiddleware` grants the SPA origins
+cross-origin access with credentials. Authentication is a session cookie managed
+by the server. Guest/share access to a dashboard uses
 `?user=<id>&token=<token>` query parameters instead of a session.
 
 All names are lowercase snake_case.

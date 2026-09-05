@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  API_BASE,
   addSite,
   readFirstDump,
   signUp,
@@ -58,7 +59,7 @@ test("guest share access shows the dashboard without a session", async ({ page, 
   await accountWithData(page, 10);
 
   // Enable guest access and grab the account uuid from the dump stream.
-  const res = await page.request.post("/reset_token");
+  const res = await page.request.post(`${API_BASE}/reset_token`);
   expect(res.status()).toBe(200);
   const { token } = await res.json();
   const dump = await readFirstDump(page);

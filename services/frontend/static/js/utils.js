@@ -5,6 +5,25 @@ script.dataset.server = "https://simple-web-analytics.com";
 script.src = "https://cdn.counter.dev/script-testing.js";
 document.getElementsByTagName("head")[0].appendChild(script);
 
+// The API lives on its own hostname (api.counter.dev / api.counterdev.test);
+// unknown hosts (tests, direct backend access) keep same-origin URLs. The
+// local frontend must be served as counterdev.test: subdomains of a bare
+// "counterdev" are separate sites for the browser, which then drops the
+// session cookie (subdomains of a two-label base like counterdev.test are
+// same-site and the cookie flows over plain HTTP).
+function apiBase() {
+    var host = window.location.hostname;
+    if (host === "counter.dev" || host === "www.counter.dev") return "https://api.counter.dev";
+    if (host === "counterdev.test") return "http://api.counterdev.test";
+    return "";
+}
+
+// Prefix API paths with the API host; other URLs (e.g. form action="")
+// stay on the current origin.
+function apiUrl(url) {
+    return url.charAt(0) === "/" ? apiBase() + url : url;
+}
+
 function simpleForm(formSelector, arg) {
     var success, formEl;
     if (typeof arg === "function") {
@@ -24,8 +43,9 @@ function simpleForm(formSelector, arg) {
         var el = evt.target;
         $.ajax({
             type: el.getAttribute("method") || "POST",
-            url: el.getAttribute("action"),
+            url: apiUrl(el.getAttribute("action")),
             data: $(el).serialize(),
+            xhrFields: { withCredentials: true },
             success: success,
             error: function (request, status, error) {
                 notify(request.responseText);
@@ -45,7 +65,7 @@ function escapeHtml(unsafe) {
 
 function dispatchPushEvents(url, event_prefix) {
     var prefix = event_prefix || "push-";
-    var source = new EventSource(url);
+    var source = new EventSource(apiUrl(url), { withCredentials: true });
     source.onmessage = (event) => {
         let serverData = JSON.parse(event.data);
         document.dispatchEvent(

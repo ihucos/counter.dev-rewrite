@@ -37,6 +37,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "core.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -95,9 +96,18 @@ TEMPLATES = [
     },
 ]
 
-# All endpoints are same-origin relative URLs (see docs/api.md), so no CORS
-# is configured. The API endpoints are CSRF-exempt and rely on the session
-# cookie only.
+# API endpoints are reached cross-origin (the SPA on counter.dev calls
+# api.counter.dev directly), so core.middleware.CorsMiddleware grants the SPA
+# origins access, with credentials so the session cookie flows. The API
+# endpoints are CSRF-exempt and rely on the session cookie only. Locally the
+# SPA runs on counterdev.test, which is same-site with api.counterdev.test
+# (two-label base under a non-TLD), so the SameSite=Lax cookie just works.
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    "DJANGO_CORS_ORIGINS",
+    "https://counter.dev,https://www.counter.dev,http://counterdev.test",
+).split(",")
+
+# When behind the nginx reverse proxy, trust the X-Forwarded-Proto header
 
 # When behind the nginx reverse proxy, trust the X-Forwarded-Proto header
 USE_X_FORWARDED_HOST = True
