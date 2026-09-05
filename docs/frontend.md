@@ -17,7 +17,7 @@ The `build` compose service regenerates `out/` on every `docker compose up` (see
 
 ## Shared plumbing (`static/js/utils.js`)
 
-- **`apiBase()` / `apiUrl()`** — rewrite API paths to the API hostname based on the current hostname (`counter.dev` → `https://api.counter.dev`, `counterdev.test` → `http://api.counterdev.test`, anything else → same origin, which is what the e2e suite and direct backend access rely on).
+- **`apiBase()` / `apiUrl()`** — rewrite API paths to the API hostname based on the current hostname (`counter.dev` → `https://api.counter.dev`, `counterdev.test` → `http://api.counterdev.test`, anything else → same origin, which is what direct backend access relies on).
 - **`apiGetJSON(path)`** — GET with `credentials: "include"`, forwarding the page's query string so guest (`?user=&token=`) and demo (`?demo=1`) access flow through. Returns `null` on 401 instead of throwing; this is the "not signed in" signal.
 - **`simpleForm(selector, target)`** — intercepts a form submit and POSTs it as `application/x-www-form-urlencoded` via fetch; on success either redirects (`target` is a URL) or calls the callback with the response text. All auth forms (login, sign up, recover, feedback) go through this.
 - Modal system (`openModal`/`closeModal`), `notify()`, tabs, slide helpers — minimal vanilla replacements for the previously used jQuery plugins.

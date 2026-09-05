@@ -33,7 +33,7 @@ docker compose up       # from the repo root; the gateway on :80 is the
 | Backend (API/admin) | http://api.counterdev.test | https://api.counter.dev |
 
 `localhost:80` shows the rejection page listing the hostnames, so a wrong
-URL tells you how to fix itself. Testing, e2e suite and further details:
+URL tells you how to fix itself. Testing and further details:
 [testing.md](testing.md), [architecture.md](architecture.md).
 
 ## Management commands

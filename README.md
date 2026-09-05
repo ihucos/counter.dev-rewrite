@@ -41,5 +41,5 @@ Performance and development speed, achieved through: dev/prod parity, infra as c
 - [docs/getting-started.md](docs/getting-started.md) — setup and running
 - [docs/architecture.md](docs/architecture.md) — services, data flow, gotchas
 - [docs/api.md](docs/api.md) — API endpoints
-- [docs/testing.md](docs/testing.md) — backend tests and Playwright e2e suite
+- [docs/testing.md](docs/testing.md) — backend tests
 - [docs/design-issues.md](docs/design-issues.md) — known gaps and open decisions

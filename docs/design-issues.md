@@ -1,6 +1,6 @@
 # Design issues & known gaps
 
-Found while building the e2e suite and clicking through the UI. Items marked
+Found while building and clicking through the UI. Items marked
 **fixed** are kept as a record of what changed; the rest need a decision or
 deliberate follow-up, not a quick fix.
 
@@ -9,8 +9,7 @@ deliberate follow-up, not a quick fix.
 The tracking code now embeds `data-id` = **username** (the tracking-code
 component reads `dump.user.id`), matching `sync.py`'s username lookup and the
 `log:<host>:<username>` log key. The uuid stays as the account identifier for
-guest/share links (`?user=<uuid>&token=...`). e2e tests ingest with the
-data-id parsed from the tracking code itself.
+guest/share links (`?user=<uuid>&token=...`).
 
 ## Backend doesn't send what the dashboard expects — fixed
 
