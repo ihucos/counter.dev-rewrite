@@ -63,6 +63,26 @@ test("logging in with a fresh account (no sites yet) ends on the setup page", as
   await expect(page.locator(".fill-username").first()).toHaveText(user);
 });
 
+test("the navbar hides Log in/Sign up for logged-in users", async ({ page }) => {
+  const user = uniqueName();
+  await signUp(page, user);
+
+  await page.goto("/index.html");
+  await expect(page.locator(".fill-username").first()).toHaveText(user);
+  // hasUser() must also hide the guest links, which noUser() may have shown
+  for (const el of await page.locator(".no-user").all()) {
+    await expect(el).toBeHidden();
+  }
+  await expect(page.locator(".has-user.dropdown")).toBeVisible();
+
+  // After signing out, the guest links come back. /logout is a GET link in
+  // the navbar and redirects, so navigate like the real sign-out link does.
+  await page.goto(`${API_BASE}/logout`, { waitUntil: "commit" });
+  await page.reload();
+  await expect(page.locator(".no-user.profile-guest")).toBeVisible();
+  await expect(page.locator(".has-user.dropdown")).toBeHidden();
+});
+
 test("the dashboard requires a session", async ({ page }) => {
   await page.goto("/dashboard.html");
   // push-nouser sends anonymous visitors back to the welcome page.

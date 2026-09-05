@@ -63,6 +63,7 @@ customElements.define(
         }
 
         hasUser(user) {
+            document.querySelectorAll(".no-user").forEach((el) => (el.style.display = "none"));
             document.querySelectorAll(".has-user").forEach((el) => (el.style.display = "block"));
             Array.from(document.getElementsByClassName("fill-username")).forEach((el) => {
                 el.innerHTML = escapeHtml(user);
