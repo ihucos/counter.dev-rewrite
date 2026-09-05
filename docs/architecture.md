@@ -6,10 +6,10 @@ Six services, one machine, root [compose.yaml](../compose.yaml) includes each se
 
 | Service | Tech | Role |
 |---|---|---|
-| **gateway** | nginx | Edge proxy on :80: `/api/*`, `/admin/` → backend; `/tracker/*`, `/track`, `/trackpage` → tracker; rest → frontend. |
-| **frontend** | nginx + pelican | Static site on :8080; sidecar container regenerates the blog/help output on every `up`. |
-| **tracker** | Go | Hot-path ingest on :8001: parse beacons, write Redis. Never touches Postgres. |
-| **backend** | Django 5 | Auth, dashboard API, admin on :8000. |
+| **gateway** | nginx | Edge proxy on :80 — the only published port. Routing is by Host header, with parity between local and production names: `counter.dev`/`counterdev` → frontend, `t.counter.dev`/`t.counterdev` → tracker, `api.counter.dev`/`api.counterdev` → backend; any other hostname (e.g. `localhost`) is rejected with a static page promoting the hostnames. |
+| **frontend** | nginx + pelican | Static site on :8080 (internal only); sidecar container regenerates the blog/help output on every `up`. |
+| **tracker** | Go | Hot-path ingest on :8001 (internal only): parse beacons, write Redis. Never touches Postgres. |
+| **backend** | Django 5 | Auth, dashboard API, admin on :8000 (internal only). |
 | **sync** | Django command | `manage.py sync --forever --sleep 1` — drains Redis into Postgres. |
 | **redis** | Redis | Ingest buffer + Django cache/session backend. |
 | **postgres** | Postgres | Aggregated counts, users, auth. |

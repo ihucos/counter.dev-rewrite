@@ -3,8 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
+    # Internal only; the gateway routes /tracker/ and t.counter.dev here.
     depends_on:
       - redis
     environment:

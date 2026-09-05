@@ -1,9 +1,13 @@
 import { expect, type Page } from "@playwright/test";
+import { request as httpRequest } from "node:http";
 
-// The tracker service is published on :8001 by the root compose file. It
-// records visits in Redis; the `sync` container moves them into Postgres
-// (within a second), from where the dashboard's /dump endpoint reads them.
-export const TRACKER_URL = "http://localhost:8001";
+// The tracker is reached through the gateway as t.counterdev (the gateway
+// routes by Host header). We talk to 127.0.0.1 directly with an explicit
+// Host header, so /etc/hosts entries aren't required to run the suite. The
+// tracker records visits in Redis; the `sync` container moves them into
+// Postgres (within a second), from where the dashboard's /dump endpoint
+// reads them.
+export const TRACKER_HOST = "t.counterdev";
 
 // A realistic desktop Chrome user agent — the tracker silently drops bot
 // user agents (including Playwright's default HeadlessChrome).
@@ -64,12 +68,25 @@ export async function trackVisit(site: string, id: string, spec: VisitSpec = {})
   if (!isPageview) headers["Accept-Language"] = "de-DE,de;q=0.9";
 
   const path = isPageview ? "/trackpage" : "/track";
-  const res = await fetch(`${TRACKER_URL}${path}`, {
-    method: "POST",
-    headers,
-    body: params,
+  const res = await new Promise<{ statusCode?: number; text: string }>((resolve, reject) => {
+    const req = httpRequest(
+      {
+        host: "127.0.0.1",
+        port: 80,
+        path,
+        method: "POST",
+        headers: { ...headers, Host: TRACKER_HOST },
+      },
+      (res) => {
+        let text = "";
+        res.on("data", (chunk) => (text += chunk));
+        res.on("end", () => resolve({ statusCode: res.statusCode, text }));
+      },
+    );
+    req.on("error", reject);
+    req.end(params.toString());
   });
-  if (!res.ok) {
+  if (res.statusCode === undefined || res.statusCode >= 400) {
     throw new Error(`${path} returned ${res.status}: ${await res.text()}`);
   }
 }

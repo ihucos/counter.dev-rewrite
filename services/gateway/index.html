@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>counter.dev — hostname required</title>
+  <style>
+    body { font-family: sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; color: #222; }
+    h1 { font-size: 1.4rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #ddd; }
+    th { border-bottom: 2px solid #222; }
+    code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>This stack answers on its hostnames only</h1>
+  <p>counter.dev is served under <strong>counterdev</strong> locally and
+  <strong>counter.dev</strong> in production — everything else gets this page.</p>
+  <table>
+    <tr>
+      <th>Service</th>
+      <th>Local</th>
+      <th>Production</th>
+    </tr>
+    <tr>
+      <td>Frontend</td>
+      <td><a href="http://counterdev/">counterdev</a></td>
+      <td><code>counter.dev</code></td>
+    </tr>
+    <tr>
+      <td>Tracker</td>
+      <td><a href="http://t.counterdev/">t.counterdev</a></td>
+      <td><code>t.counter.dev</code></td>
+    </tr>
+    <tr>
+      <td>Backend</td>
+      <td><a href="http://api.counterdev/">api.counterdev</a></td>
+      <td><code>api.counter.dev</code></td>
+    </tr>
+  </table>
+  <p>For local development, add to <code>/etc/hosts</code>:</p>
+  <p><code>127.0.0.1 counterdev t.counterdev api.counterdev</code></p>
+</body>
+</html>

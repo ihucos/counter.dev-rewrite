@@ -17,18 +17,21 @@ Notes:
 - Redis fixtures flush a dedicated per-worker DB around every test, so runs
   are isolated from the dev `sync` container.
 - `frontend` and `gateway` compose files work too (`docker compose up` builds
-  and serves the site on :8080); they're not needed for the tests.
+  and serves the site via the gateway on :80); they're not needed for the
+  tests. Postgres/Redis must stay published for this host-side suite.
 
 # E2E tests
 
-Playwright tests in `e2e/tests/` run against the site served by
-`docker compose up` — the frontend nginx on http://localhost:8080. The
-frontend nginx proxies the backend API endpoints (`/login`, `/register`,
-`/dump`, …) to the Django backend, so the full user flows work there. The
-`webServer` config in `e2e/playwright.config.ts` starts the stack
-(`docker compose up --wait frontend`, including the `build` container that
-generates the blog/help pages and the backend that serves the API) when
-nothing is listening, and reuses a running one otherwise.
+Playwright tests in `e2e/tests/` run against the gateway on :80 under the
+local hostname http://counterdev. Only the gateway publishes a host port;
+the frontend, backend and tracker are reachable only through it, routed by
+Host header (see [getting-started.md](getting-started.md)). The tests map
+the hostnames to 127.0.0.1 via Chromium host-resolver rules and an explicit
+Host header for the tracker requests, so `/etc/hosts` entries are not
+required. The `webServer` config in `e2e/playwright.config.ts` starts the
+stack (`docker compose up --wait gateway sync`, including the `build`
+container that generates the blog/help pages and the backend that serves
+the API) when nothing is listening, and reuses a running one otherwise.
 
 ```sh
 docker compose up -d      # from the repo root (or let the config start it)
@@ -43,8 +46,9 @@ sign-up / log-in flow (plus account recovery and deletion), and the
 dashboard (see `e2e/tests/`).
 
 The dashboard tests ingest real tracking data by sending HTTP requests to
-the tracker service on :8001 (`POST /track` and `/trackpage`, like the
-external tracking script does) and then assert what the dashboard renders.
+the tracker via the gateway as `t.counterdev` (`POST /track` and
+`/trackpage`, like the external tracking script does) and then assert what
+the dashboard renders.
 This requires the `tracker` and `sync` compose services to be running (the
 `webServer` config starts them); the browser runs pinned to UTC so the
 "today" bucket matches between tracker and dashboard. Known dashboard gaps

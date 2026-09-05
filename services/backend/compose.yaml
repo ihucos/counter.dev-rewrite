@@ -3,8 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    # Internal only; the gateway routes /backend/ and api.counter.dev here.
     # Apply migrations before serving so the stack works standalone.
     command: sh -c "uv run python manage.py migrate --no-input && uv run python manage.py runserver 0.0.0.0:8000"
     depends_on:

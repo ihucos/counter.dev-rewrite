@@ -1,10 +1,9 @@
 services:
-  # Serves the prebuilt site on port 8080 (the gateway's `frontend` upstream).
+  # Serves the prebuilt site internally on port 8080 (the gateway's
+  # `frontend` upstream); not published to the host.
   # ./static holds the app pages, ./out the generated blog/pages/help.
   frontend:
     image: nginx:alpine
-    ports:
-      - "8080:8080"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./static:/usr/share/nginx/html

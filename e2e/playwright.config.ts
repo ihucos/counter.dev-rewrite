@@ -1,26 +1,30 @@
 import { defineConfig } from "@playwright/test";
 
-// Tests run against the site served by `docker compose up` (the frontend
-// nginx on :8080). The dashboard tests additionally ingest tracking data via
-// the tracker service on :8001, so it and the `sync` service (which moves
-// the data from Redis into Postgres) must run as well. If nothing is
-// listening, the config starts the compose stack itself and tears it down
-// after; it reuses a running one otherwise.
+// Tests run against the gateway on :80 under the local hostname
+// `counterdev` (frontend), with `t.counterdev` used to ingest tracking data
+// and `sync` moving the data from Redis into Postgres. The host-resolver
+// rules map the hostnames to 127.0.0.1, so /etc/hosts entries are not
+// required to run the suite. If nothing is listening, the config starts the
+// compose stack itself and tears it down after; it reuses a running one
+// otherwise.
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
   use: {
-    baseURL: "http://localhost:8080",
+    baseURL: "http://counterdev",
+    launchOptions: {
+      args: ["--host-resolver-rules=MAP counterdev 127.0.0.1,MAP t.counterdev 127.0.0.1,MAP api.counterdev 127.0.0.1"],
+    },
     // Deterministic dates: the browser reports UTC, the tracker records
     // visits with utcoffset=0, so both agree on "today".
     timezoneId: "UTC",
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "docker compose up --wait frontend tracker sync",
-    url: "http://localhost:8080",
+    command: "docker compose up --wait gateway sync",
+    url: "http://counterdev",
     reuseExistingServer: true,
     timeout: 300_000,
     stdout: "ignore",
