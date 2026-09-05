@@ -11,15 +11,15 @@ body.modal-open {
   left: 0;
   padding: 10px;
   overflow: auto;
+  display: flex;
   background: rgba(0, 0, 0, 0.4);
   transition: opacity 0.2s;
 }
 
+/* Centered via auto margins inside the scrollable blocker: when the modal is
+   taller than the viewport, the blocker scrolls instead of clipping content. */
 .modal {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  margin: auto;
   max-width: 100%;
   background: #fff;
   transition: opacity 0.2s;

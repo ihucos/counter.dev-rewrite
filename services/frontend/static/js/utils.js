@@ -57,17 +57,31 @@ function openModal(el, opts) {
     blocker.className = "modal-blocker";
     blocker.style.zIndex = ++modalZIndex;
     document.body.appendChild(blocker);
+    // The modal lives inside the blocker so it scrolls with the dimmed
+    // viewport and sits above it; remember where to put it back.
+    var savedParent = el.parentNode;
+    var savedNext = el.nextSibling;
+    blocker.appendChild(el);
     el.classList.add("modal");
     el.style.display = "block";
-    el.style.zIndex = ++modalZIndex;
     document.body.classList.add("modal-open");
-    openModalStack.push({ el: el, blocker: blocker, opts: opts });
+    openModalStack.push({ el: el, blocker: blocker, opts: opts, savedParent: savedParent, savedNext: savedNext });
     // fade in
     el.style.opacity = "0";
     blocker.style.opacity = "0";
     requestAnimationFrame(function () {
         el.style.opacity = "1";
         blocker.style.opacity = "1";
+    });
+    // Close when clicking the dimmed area outside the modal.
+    blocker.addEventListener("click", function (event) {
+        if (event.target !== blocker || opts.blockerClose === false) {
+            return;
+        }
+        var top = openModalStack[openModalStack.length - 1];
+        if (top && top.blocker === blocker) {
+            closeModal();
+        }
     });
 }
 
@@ -77,10 +91,13 @@ function closeModal() {
         return;
     }
     entry.el.dispatchEvent(new CustomEvent("modal-before-close", { bubbles: true }));
-    entry.blocker.remove();
-    entry.el.classList.remove("modal");
     entry.el.style.display = "none";
-    entry.el.style.zIndex = "";
+    entry.el.style.opacity = "";
+    entry.el.classList.remove("modal");
+    if (entry.savedParent) {
+        entry.savedParent.insertBefore(entry.el, entry.savedNext);
+    }
+    entry.blocker.remove();
     if (openModalStack.length === 0) {
         document.body.classList.remove("modal-open");
     }
