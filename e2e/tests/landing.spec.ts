@@ -19,7 +19,7 @@ test("static assets load", async ({ page }) => {
   const failed: string[] = [];
   page.on("response", (r) => {
     if (r.url().startsWith("http://counterdev") && r.status() >= 400) {
-      // App pages load API endpoints without an extension (e.g. /dump);
+      // App pages load API endpoints without an extension (e.g. /query);
       // only flag broken static files.
       if (/\.[a-z0-9]+$/i.test(new URL(r.url()).pathname)) {
         failed.push(`${r.status()} ${r.url()}`);

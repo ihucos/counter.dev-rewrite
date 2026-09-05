@@ -163,38 +163,27 @@ class TestNewsletterRegisterView:
         assert client.post("/newsletter_register", {"mail": "a@b.com"}).status_code == 200
 
 
-class TestGuestDumpAccess:
-    """The /dump endpoint accepts ?user=<uuid>&token=<share_token>."""
-
-    def _first_message(self, resp, wanted):
-        for chunk in resp.streaming_content:
-            for part in chunk.decode().split("\n\n"):
-                part = part.strip()
-                if part.startswith("data: "):
-                    msg = json.loads(part[len("data: "):])
-                    if msg["type"] == wanted:
-                        return msg
-        raise AssertionError(f"no {wanted} message")
+class TestGuestAccess:
+    """Dashboard-data endpoints accept ?user=<uuid>&token=<share_token>."""
 
     def test_guest_with_valid_token_sees_data(self, client, user, host, counts):
         user.share_token = "tok"
         user.save()
-        resp = client.get("/dump", {"user": str(user.uuid), "token": "tok"})
-        dump = self._first_message(resp, "dump")["payload"]
-        assert dump["sites"]["example.com"]["visits"]["day"]["pageview"]["/home"] == 10
+        resp = client.get("/query", {"site": "example.com", "user": str(user.uuid), "token": "tok"})
+        assert json.loads(resp.content)["visits"]["pageview"]["/home"] == 13
 
-    def test_guest_with_bad_token_gets_nouser(self, client, user, host):
+    def test_guest_with_bad_token_is_unauthorized(self, client, user, host):
         user.share_token = "tok"
         user.save()
-        resp = client.get("/dump", {"user": str(user.uuid), "token": "wrong"})
-        assert self._first_message(resp, "nouser") is not None
+        resp = client.get("/query", {"site": "example.com", "user": str(user.uuid), "token": "wrong"})
+        assert resp.status_code == 401
 
-    def test_guest_with_unknown_uuid_gets_nouser(self, client):
+    def test_guest_with_unknown_uuid_is_unauthorized(self, client):
         resp = client.get(
-            "/dump",
-            {"user": "00000000-0000-0000-0000-000000000000", "token": "tok"},
+            "/query",
+            {"site": "example.com", "user": "00000000-0000-0000-0000-000000000000", "token": "tok"},
         )
-        assert self._first_message(resp, "nouser") is not None
+        assert resp.status_code == 401
 
 
 class TestParseLogLine:

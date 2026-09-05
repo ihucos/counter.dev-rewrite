@@ -5,7 +5,7 @@ import { request as httpRequest } from "node:http";
 // gateway routes by Host header). We talk to 127.0.0.1 directly with an
 // explicit Host header, so /etc/hosts entries aren't required to run the
 // suite. The tracker records visits in Redis; the `sync` container moves them into
-// Postgres (within a second), from where the dashboard's /dump endpoint
+// Postgres (within a second), from where the dashboard's /query endpoint
 // reads them.
 export const TRACKER_HOST = "t.counterdev.test";
 
@@ -94,49 +94,70 @@ export async function trackVisit(site: string, id: string, spec: VisitSpec = {})
   }
 }
 
-type Dump = {
-  user: { uuid: string };
-  sites: Record<string, { visits: Record<string, Record<string, Record<string, number>>> }>;
+export type Me = {
+  user: { id: string; uuid: string; prefs: Record<string, unknown>; timezone?: number };
+  meta: { utcoffset: number; sessionless: boolean; demo: boolean };
 };
 
-// Read the account state by listening for the first "dump" event of the
-// /dump SSE stream with the page's session cookies (or guest parameters).
-// Returns null if the stream reports no signed-in user.
-export async function readFirstDump(page: Page, query = "utcoffset=0"): Promise<Dump | null> {
+// Read the signed-in user's state via /me with the page's session cookies
+// (or guest parameters). Returns null on 401 ("not signed in").
+export async function readMe(page: Page, query = "utcoffset=0"): Promise<Me | null> {
   return page.evaluate(
     ([base, q]) =>
-      new Promise((resolve, reject) => {
-        const es = new EventSource(`${base}/dump?${q}`, { withCredentials: true });
-        const timeout = setTimeout(() => {
-          es.close();
-          reject(new Error("no dump event within 10s"));
-        }, 10_000);
-        es.onmessage = (ev) => {
-          const { type, payload } = JSON.parse(ev.data);
-          if (type === "dump" || type === "nouser") {
-            clearTimeout(timeout);
-            es.close();
-            resolve(payload);
-          }
-        };
-      }),
+      fetch(`${base}/me?${q}`, { credentials: "include" }).then(
+        (r) => (r.status === 401 ? null : r.json()),
+      ),
     [API_BASE, query],
   );
 }
 
-export function bucketVisits(dump: Dump, site: string, range: string): Record<string, number> {
-  return dump?.sites?.[site]?.visits?.[range]?.date ?? {};
+// The sites an account has (the /sites list is the source of truth).
+// Returns null on 401 ("not signed in").
+export async function listSites(page: Page, query = ""): Promise<Array<{ name: string }> | null> {
+  return page.evaluate(
+    ([base, q]) =>
+      fetch(`${base}/sites${q ? "?" + q : ""}`, { credentials: "include" }).then(
+        (r) => (r.status === 401 ? null : r.json()),
+      ),
+    [API_BASE, query],
+  );
 }
 
 export function sumVisits(visits: Record<string, number>): number {
   return Object.values(visits).reduce((acc, n) => acc + n, 0);
 }
 
+// Query the analytics data for a site via /query; `start`/`end` are ISO
+// dates and either may be null (open-ended).
+export async function queryVisits(
+  page: Page,
+  site: string,
+  start: string | null,
+  end: string | null,
+  query = "utcoffset=0",
+): Promise<Record<string, Record<string, number>>> {
+  const params = new URLSearchParams({ site, ...(query ? Object.fromEntries(new URLSearchParams(query)) : {}) });
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+  return page.evaluate(
+    ([base, q]) => fetch(`${base}/query?${q}`, { credentials: "include" }).then((r) => r.json()),
+    [API_BASE, params.toString()],
+  );
+}
+
+// The "date" category buckets one item per day, so summing it gives the
+// total number of visits in the range.
+export function dayTotals(visits: Record<string, Record<string, number>>): Record<string, number> {
+  return visits?.date ?? {};
+}
+
 // Wait until the ingested visits have made it through Redis and the sync
-// service into Postgres, i.e. until /dump reports them for the given site.
+// service into Postgres, i.e. until /query reports them for the given site
+// today.
 export async function waitForVisits(page: Page, site: string, min: number) {
+  const today = new Date().toISOString().slice(0, 10);
   await expect
-    .poll(async () => sumVisits(bucketVisits(await readFirstDump(page), site, "day")), {
+    .poll(async () => sumVisits(dayTotals(await queryVisits(page, site, today, today))), {
       timeout: 20_000,
       intervals: [500],
     })

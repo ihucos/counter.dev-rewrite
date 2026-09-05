@@ -37,7 +37,7 @@ customElements.define(
                     </form>
                   </div>`;
 
-            this.querySelector("form").setAttribute("action", this.getQueryUrl());
+            this.querySelector("form").setAttribute("action", "");
             this.fromInputEl = this.querySelector('input[name="from"]');
             this.toInputEl = this.querySelector('input[name="to"]');
 
@@ -63,15 +63,18 @@ customElements.define(
                 this.querySelector('form button[type="submit"]').removeAttribute("disabled");
             });
 
-            simpleForm(this.querySelector("form"), (resp) => {
-                let data = JSON.parse(resp);
-                let from = moment(this.fromInputEl.value);
-                let to = moment(this.toInputEl.value);
-                let detail = { resp: data, to: to, from: from };
+            // Announce the picked range; dashboard.js fetches /query for it and
+// redraws, the selector renames its range option.
+            this.querySelector("form").onsubmit = (evt) => {
+                evt.preventDefault();
+                let detail = {
+                    from: moment(this.fromInputEl.value),
+                    to: moment(this.toInputEl.value),
+                };
                 document.dispatchEvent(new CustomEvent("selector-daterange-fetched", { detail: detail }));
                 this.closeSuccess = true;
                 $.modal.close();
-            });
+            };
 
             document.addEventListener("selector-daterange-fetch", (evt) => {
                 this.popup();
@@ -92,13 +95,6 @@ customElements.define(
             this.picker.clear();
 
             $(this).modal();
-        }
-
-        getQueryUrl() {
-            let url = new URL(window.location.href);
-            let params = new URLSearchParams(url.search);
-            //params.set("utcoffset", getUTCOffset());
-            return "/query?" + params.toString();
         }
     },
 );

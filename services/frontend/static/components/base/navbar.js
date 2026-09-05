@@ -33,29 +33,34 @@ customElements.define(
             document.addEventListener("push-navbar-nouser", () => {
                 this.eventPushNavbarNouserCalled = true;
                 this.noUser();
-                // don't leave an open connection to server to save resources
-                eventSourceObj.close();
             });
             document.addEventListener("push-navbar-dump", (evt) => {
-                let dump = evt.detail;
+                let me = evt.detail;
                 this.eventPushNavbarDumpCalled = true;
-                this.hasUser(dump.user.id);
-                sessionStorage.setItem(usernameCacheKey, dump.user.id);
+                this.hasUser(me.user.id);
+                sessionStorage.setItem(usernameCacheKey, me.user.id);
                 // the fallback is because older user's dont set the
                 // utcoffset by default
-                this.drawEditaccount(dump.user.prefs);
+                this.drawEditaccount(me.user.prefs);
 
                 // Adapt the feedback form mail input field
-                if (dump.user.prefs.mail) {
-                    document.getElementById("feedback-mail").setAttribute("value", dump.user.prefs.mail);
+                if (me.user.prefs.mail) {
+                    document.getElementById("feedback-mail").setAttribute("value", me.user.prefs.mail);
                     document.getElementById("feedback-mail").setAttribute("type", "hidden");
                 }
 
                 document.dispatchEvent(new CustomEvent("userloaded"));
-                // don't leave an open connection to server to save resources
-                eventSourceObj.close();
             });
-            var eventSourceObj = dispatchPushEvents("/dump", "push-navbar-");
+            apiGetJSON("/me").then(
+                (me) => {
+                    if (me === null) {
+                        document.dispatchEvent(new Event("push-navbar-nouser"));
+                        return;
+                    }
+                    document.dispatchEvent(new CustomEvent("push-navbar-dump", { detail: { user: me.user, meta: me.meta } }));
+                },
+                () => document.dispatchEvent(new Event("push-navbar-nouser")),
+            );
         }
 
         noUser() {

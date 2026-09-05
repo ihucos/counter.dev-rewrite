@@ -74,18 +74,22 @@ function escapeHtml(unsafe) {
     return (unsafe + "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-function dispatchPushEvents(url, event_prefix) {
-    var prefix = event_prefix || "push-";
-    var source = new EventSource(apiUrl(url), { withCredentials: true });
-    source.onmessage = (event) => {
-        let serverData = JSON.parse(event.data);
-        document.dispatchEvent(
-            new CustomEvent(prefix + serverData.type, {
-                detail: serverData.payload,
-            }),
-        );
-    };
-    return source;
+// GET a JSON endpoint with credentials, forwarding the current query string
+// so guest (?user=&token=) and demo (?demo=1) access flows through.
+// Returns the parsed body, or null on 401 ("not signed in").
+function apiGetJSON(path) {
+    var params = new URLSearchParams(window.location.search);
+    return fetch(apiUrl(path) + (params.toString() ? "?" + params.toString() : ""), {
+        credentials: "include",
+    }).then(function (resp) {
+        if (resp.status === 401) {
+            return null;
+        }
+        if (!resp.ok) {
+            throw resp;
+        }
+        return resp.json();
+    });
 }
 
 function notify(msg, cb) {

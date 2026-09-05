@@ -21,6 +21,7 @@ Chart.defaults.global.tooltips = {
         displayColors: false,
     },
 };
+
 Chart.defaults.global.tooltips.callbacks.label = function (tooltipItem, data) {
     var value = data.datasets[0].data[tooltipItem.index];
     return numberFormat(value);
@@ -99,62 +100,28 @@ connectData("dashboard-week", k("weekday"));
 connectData("dashboard-time", k("hour"));
 connectData("dashboard-share-account", (dump) => [dump.user, dump.meta]);
 
-document.addEventListener("push-dump", (evt) => {
-    if (Object.keys(evt.detail.sites).length === 0) {
-        window.location.href = "setup.html";
-    }
-});
+// --- Data loading ---------------------------------------------------------------
+// The dashboard fetches data only on page load and on user interactions
+// (date-range or site changes); there is no live connection.
 
-document.addEventListener("push-dump", (evt) => {
-    var dump = evt.detail;
-    patchDump(dump);
-    document.dispatchEvent(new CustomEvent("redraw", { detail: dump }));
-});
+// Each preset range maps to the range the counters compare it against
+// (dashboard/counter/_base.js); both buckets are fetched together.
+const COMPARISON_RANGE = {
+    day: "yesterday",
+    yesterday: "last7",
+    last7: "last30",
+    last30: "all",
+    month: "year",
+    year: "all",
+    all: "all",
+    daterange: "all",
+};
 
-document.addEventListener("push-archive", (evt) => {
-    window.state.archives = evt.detail;
-});
-
-document.addEventListener("push-nouser", () => {
-    window.location.href = "welcome.html";
-});
-
-document.addEventListener("push-oldest-archive-date", (evt) => {
-    customElements.whenDefined("dashboard-daterangeselector").then((el) => {
-        let drs = document.getElementsByTagName("dashboard-daterangeselector")[0];
-        drs.draw(evt.detail || moment().format("YYYY-MM-DD"));
-    });
-});
-
-function patchArchiveVisit(visit) {
-    if (!visit.ref) {
-        visit.ref = {};
-    }
-    return visit;
-}
-
-function patchDump(dump) {
-    addArchivesToDump(window.state.archives, dump);
-    addDaterangeToDump(window.state.daterange || {}, dump);
-}
-
-function addArchivesToDump(archives, dump) {
-    // The backend does not send archives (yet); keep the dump's own last7 /
-    // last30 buckets in that case instead of crashing on missing data.
-    if (!archives || !archives["-7:-2"] || !archives["-30:-2"]) {
-        return dump;
-    }
-    for (const site of Object.keys(dump.sites)) {
-        dump.sites[site].visits.last7 = patchArchiveVisit(mergeVisits([dump.sites[site].visits.day, dump.sites[site].visits.yesterday, archives["-7:-2"][site] || {}]));
-
-        dump.sites[site].visits.last30 = patchArchiveVisit(mergeVisits([dump.sites[site].visits.day, dump.sites[site].visits.yesterday, archives["-30:-2"][site] || {}]));
-    }
-    return dump;
-}
+let me = null; // payload of /me
+let siteList = []; // payload of /sites (the account's real host names)
 
 // The dashboard expects every range bucket to carry all tracker categories;
-// fill in empty maps for dimensions the backend had no data for (new
-// accounts, unused ranges, custom dateranges).
+// fill in empty maps for dimensions the backend had no data for.
 const VISIT_DIMENSIONS = [
     "lang", "ref", "page", "date", "weekday", "platform",
     "browser", "device", "country", "screen", "hour",
@@ -170,10 +137,105 @@ function normalizeBucket(bucket) {
     return bucket;
 }
 
+// Fixed presets are computed client-side as start/end values; the query
+// endpoint only serves arbitrary (open-ended) ranges. Returns [start, end]
+// with null meaning "unbounded".
+function rangeDates(range, utcoffset) {
+    const fmt = (m) => m.format("YYYY-MM-DD");
+    const today = moment().utcOffset(utcoffset);
+    switch (range) {
+        case "day":
+            return [fmt(today), fmt(today)];
+        case "yesterday":
+            return [fmt(today.clone().subtract(1, "days")), fmt(today.subtract(1, "days"))];
+        case "last7":
+            return [fmt(today.clone().subtract(6, "days")), fmt(today)];
+        case "last30":
+            return [fmt(today.clone().subtract(29, "days")), fmt(today)];
+        case "month":
+            return [fmt(today.clone().startOf("month")), fmt(today)];
+        case "year":
+            return [fmt(today.clone().startOf("year")), fmt(today)];
+        case "all":
+            return [null, null];
+        case "daterange":
+            return [window.state.daterange_from, window.state.daterange_to];
+        default:
+            return [null, null];
+    }
+}
+
+// Site names as shown in the selector / used as dump.sites keys.
+function displaySiteNames() {
+    if (me.meta.demo) {
+        return ["counter.dev"];
+    }
+    return siteList.map((s) => s.name);
+}
+
+// The site name used in /query calls (the demo account's real host may
+// differ from the "counter.dev" name it is displayed under).
+function querySiteName(displayName) {
+    if (me.meta.demo) {
+        return siteList.map((s) => s.name)[0];
+    }
+    return displayName;
+}
+
+function currentSite() {
+    const names = displaySiteNames();
+    const select = document.getElementById("site-select");
+    if (select && names.includes(select.value)) {
+        return select.value;
+    }
+    const pref = window.dump.user.prefs.site;
+    return names.includes(pref) ? pref : names[0];
+}
+
+function currentRange() {
+    const select = document.getElementById("range-select");
+    return (select && select.value) || window.dump.user.prefs.range || "day";
+}
+
+function currentUTCOffset() {
+    return window.dump.user.prefs.utcoffset || getUTCOffset();
+}
+
+async function fetchQuery(displaySite, range) {
+    const params = new URLSearchParams(window.location.search);
+    params.set("site", querySiteName(displaySite));
+    const [start, end] = rangeDates(range, currentUTCOffset());
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    const resp = await fetch(apiUrl("/query?") + params.toString(), { credentials: "include" });
+    if (resp.status === 401) {
+        return null;
+    }
+    return resp.json();
+}
+
+// Fetch one range for the currently selected site into the dump; returns
+// false (after redirecting) when the session has expired.
+async function loadRange(range) {
+    const site = currentSite();
+    const data = await fetchQuery(site, range);
+    if (data === null) {
+        window.location.href = "welcome.html";
+        return false;
+    }
+    if (range === "daterange") {
+        window.state.daterange = { [site]: data.visits };
+    } else {
+        window.dump.sites[site].visits[range] = normalizeBucket(data.visits);
+        window.dump.sites[site].logs = data.logs;
+    }
+    return true;
+}
+
 function addDaterangeToDump(daterange, dump) {
     for (const site of Object.keys(dump.sites)) {
         let siteData = daterange[site];
-        let nildata = Object.fromEntries(Object.keys(dump.sites[site].visits.all).map((k) => [k, {}]));
+        let nildata = Object.fromEntries(VISIT_DIMENSIONS.map((k) => [k, {}]));
         if (siteData) {
             dump.sites[site].visits.daterange = { ...nildata, ...siteData };
         } else {
@@ -183,38 +245,14 @@ function addDaterangeToDump(daterange, dump) {
     }
 }
 
-function mergeVisits(visits) {
-    let merged = {};
-    for (const visit of visits) {
-        for (const [dimension, typesWithCount] of Object.entries(visit)) {
-            for (const [type, count] of Object.entries(typesWithCount)) {
-                if (!(dimension in merged)) {
-                    merged[dimension] = {};
-                }
-                if (!(type in merged[dimension])) {
-                    merged[dimension][type] = 0;
-                }
-                merged[dimension][type] += count;
-            }
-        }
+function patchDump(dump) {
+    if (window.state.daterange) {
+        addDaterangeToDump(window.state.daterange, dump);
     }
-    return merged;
 }
 
-function drawComponents() {
-    var source = dispatchPushEvents(getDumpURL());
-
-    customElements.whenDefined("dashboard-connstatus").then((el) => {
-        let connstatus = document.getElementsByTagName("dashboard-connstatus")[0];
-        connstatus.message("Connecting...");
-        source.onopen = () => connstatus.message("Live");
-        source.onerror = (err) => connstatus.message("Disconnected");
-    });
-}
-
-document.addEventListener("redraw", (evt) => {
-    let dump = evt.detail;
-    console.log("redraw", dump);
+function redraw() {
+    let dump = window.dump;
     allConnectedData.forEach(([el, getData]) => {
         // One broken component must not blank out the rest of the dashboard.
         try {
@@ -227,24 +265,104 @@ document.addEventListener("redraw", (evt) => {
             console.error("redraw of", el.localName, "failed:", err);
         }
     });
+}
+
+document.addEventListener("redraw", () => redraw());
+
+// The site/range selectors announce their changes; the dashboard then
+// fetches the affected data and redraws.
+async function onStateChanged() {
+    window.dump.user.prefs.range = currentRange();
+    if (currentRange() !== "daterange") {
+        const loaded = await loadRange(currentRange());
+        if (!loaded) return;
+    }
+    // The counters compare the selected range against its comparison range.
+    const comparison = COMPARISON_RANGE[currentRange()];
+    if (comparison && !(window.dump.sites[currentSite()].visits[comparison])) {
+        await loadRange(comparison);
+    }
+    patchDump(window.dump);
+    document.dispatchEvent(new CustomEvent("redraw", { detail: window.dump }));
+}
+
+document.addEventListener("dashboard-state-changed", onStateChanged);
+
+// A custom date range picked in the daterangeselector.
+document.addEventListener("selector-daterange-fetched", async (evt) => {
+    window.state.daterange_from = evt.detail.from.format("YYYY-MM-DD");
+    window.state.daterange_to = evt.detail.to.format("YYYY-MM-DD");
+    const loaded = await loadRange("daterange");
+    if (!loaded) return;
+    patchDump(window.dump);
+    document.dispatchEvent(new CustomEvent("redraw", { detail: window.dump }));
 });
 
-function getDumpURL() {
-    let url = new URL(window.location.href);
-    let params = new URLSearchParams(url.search);
-    params.set("utcoffset", getUTCOffset());
-    return apiBase() + "/dump?" + params.toString();
+// Pay-what-you-want prompt for accounts with 90+ days of data.
+function maybePayWhatYouWant(daysTracked) {
+    if (window.dump.meta.sessionless || daysTracked <= 90 || sessionStorage.getItem("pwyw") !== null) {
+        return;
+    }
+    whenReady("base-pwyw", (el) => el.modal());
+    sessionStorage.setItem("pwyw", "1");
+}
+
+// The "all time" bucket feeds the daterangeselector's oldest-date
+// constraint and the pay-what-you-want check.
+async function loadAllTimeBucket() {
+    if (!window.dump.sites[currentSite()].visits.all) {
+        await loadRange("all").catch(() => {});
+    }
+    const dates = Object.keys((window.dump.sites[currentSite()].visits.all || {}).date || {});
+    return dates.sort()[0] || null;
+}
+
+async function boot() {
+    me = await apiGetJSON("/me");
+    if (me === null) {
+        window.location.href = "welcome.html";
+        return;
+    }
+    siteList = await apiGetJSON("/sites");
+    if (siteList === null) {
+        window.location.href = "welcome.html";
+        return;
+    }
+    if (siteList.length === 0) {
+        window.location.href = "setup.html";
+        return;
+    }
+
+    window.dump = {
+        user: me.user,
+        meta: me.meta,
+        sites: Object.fromEntries(displaySiteNames().map((name) => [name, { visits: {}, logs: [] }])),
+    };
+    if (me.meta.demo) {
+        window.dump.user.prefs.site = "counter.dev";
+    }
+
+    const loaded = await loadRange(currentRange());
+    if (!loaded) return;
+    const comparison = COMPARISON_RANGE[currentRange()];
+    if (comparison && comparison !== currentRange() && !window.dump.sites[currentSite()].visits[comparison]) {
+        await loadRange(comparison).catch(() => {});
+    }
+    patchDump(window.dump);
+    document.dispatchEvent(new CustomEvent("redraw", { detail: window.dump }));
+
+    loadAllTimeBucket().then((oldest) => {
+        customElements.whenDefined("dashboard-daterangeselector").then(() => {
+            document.getElementsByTagName("dashboard-daterangeselector")[0].draw(oldest || moment().format("YYYY-MM-DD"));
+        });
+        maybePayWhatYouWant(Object.keys((window.dump.sites[currentSite()].visits.all || {}).date || {}).length);
+    });
 }
 
 customElements.whenDefined(selector.localName).then(() => {
     customElements.upgrade(selector);
-    drawComponents();
+    boot().catch((err) => console.error("boot failed:", err));
 });
-
-// not used currently
-function flash(msg) {
-    document.getElementsByTagName("base-flash")[0].flash(msg);
-}
 
 function numberFormat(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -392,17 +510,3 @@ function dGetNormalizedHours(hours) {
         ...formatedHours,
     };
 }
-
-whenReady("base-navbar", (el) => {
-    el.loggedInUserCallback(
-        (userDump) => {
-            // user loaded
-            var daysTracked = Math.max(...Object.values(userDump.sites).map((i) => Object.keys(i.visits.all.date).length));
-            if (daysTracked > 90 && sessionStorage.getItem("pwyw") === null && !userDump.user.isSubscribed) {
-                whenReady("base-pwyw", (el) => el.modal());
-                sessionStorage.setItem("pwyw", "1");
-            }
-        },
-        () => {},
-    );
-});

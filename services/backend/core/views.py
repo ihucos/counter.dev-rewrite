@@ -1,6 +1,5 @@
 import json
 import secrets
-import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
@@ -10,7 +9,7 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db.models import Sum
-from django.http import HttpResponse, HttpResponseBadRequest, StreamingHttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -186,57 +185,6 @@ CATEGORIES = [
     "screen",
     "hour",
 ]
-
-
-def _build_dump_payload(utcoffset, user, from_date=None, to_date=None, demo=False, sessionless=False) -> dict[str, Any]:
-    """
-    Build the full account state: user record, preferences, and visit data.
-
-    Visits are bucketed by the viewer's local time (utcoffset in hours).
-    Custom range requests additionally include a "custom" bucket.
-    """
-    today = _local_date(utcoffset)
-    yesterday = today - timedelta(days=1)
-
-    sites_data: dict[str, dict[str, Any]] = {}
-    for host in _sites_for(user):
-        visits = {
-            "day": _query_site_data(host, today, today),
-            "yesterday": _query_site_data(host, yesterday, yesterday),
-            "last7": _query_site_data(host, today - timedelta(days=6), today),
-            "last30": _query_site_data(host, today - timedelta(days=29), today),
-            "month": _query_site_data(host, today.replace(day=1), today),
-            "year": _query_site_data(host, today.replace(month=1, day=1), today),
-            "all": _query_site_data(host, date(2000, 1, 1), today + timedelta(days=365)),
-        }
-        if from_date:
-            visits["custom"] = _query_site_data(host, from_date, to_date or from_date)
-        # Fill in empty buckets for categories with no data so the frontend
-        # never reads undefined dimensions.
-        for bucket in visits.values():
-            for category in CATEGORIES:
-                bucket.setdefault(category, {})
-        sites_data[host.name] = {
-            "visits": visits,
-            "logs": _get_user_logs(user, site=host.name, limit=30),
-        }
-
-    return {
-        "user": {
-            "id": user.username,
-            "uuid": str(user.uuid) if user.uuid else "",
-            "token": user.share_token,
-            "prefs": user.prefs or {},
-            "timezone": user.timezone,
-        },
-        "meta": {
-            "utcoffset": utcoffset,
-            "range": user.prefs.get("range", "day") if user.prefs else "day",
-            "sessionless": sessionless,
-            "demo": demo,
-        },
-        "sites": sites_data,
-    }
 
 
 # --- Authentication & account -------------------------------------------------
@@ -475,65 +423,92 @@ def set_pref_range_view(request):
 # --- Dashboard data ---------------------------------------------------------------
 
 
+def _resolve_account(request):
+    """Resolve the account a dashboard-data request acts on.
+
+    Order: the session user, then guest/share access via
+    ?user=<uuid>&token=<token>, then demo access via ?demo=1 (the seeded
+    "demo" account, read-only). Returns (user, sessionless, demo); user is
+    None when nothing matched.
+    """
+    if request.user.is_authenticated:
+        return request.user, False, False
+    user = _guest_user(request)
+    if user is not None:
+        return user, True, False
+    user = _demo_user(request)
+    if user is not None:
+        return user, True, True
+    return None, False, False
+
+
 @require_GET
-def dump_sse(request):
-    """
-    Server-Sent Events endpoint that streams the full account state.
+def me_view(request):
+    """The signed-in user's state: user record and session meta.
 
-    Each message is a JSON object: {"type": "<event type>", "payload": {...}}.
-    Event types: "signedin" (session established), "dump" (full state, resent
-    periodically), "nouser" (no signed-in user).
-
-    Authentication is the session cookie, guest/share access via
-    ?user=<uuid>&token=<token>, or demo access via ?demo=1 (the seeded
-    "demo" account, read-only).
+    Feeds session bootstrap (401 means "not signed in") and the
+    share-account panel.
     """
-    sessionless = False
-    demo = False
-    user = request.user if request.user.is_authenticated else None
+    user, sessionless, demo = _resolve_account(request)
     if user is None:
-        user = _guest_user(request)
-        if user is not None:
-            sessionless = True
-        else:
-            user = _demo_user(request)
-            if user is not None:
-                sessionless = True
-                demo = True
+        return _error("not signed in", 401)
+    return _json(
+        {
+            "user": {
+                "id": user.username,
+                "uuid": str(user.uuid) if user.uuid else "",
+                "token": user.share_token,
+                "prefs": user.prefs or {},
+                "timezone": user.timezone,
+            },
+            "meta": {
+                "utcoffset": _utcoffset(request),
+                "sessionless": sessionless,
+                "demo": demo,
+            },
+        }
+    )
+
+
+@require_GET
+def query_view(request):
+    """Analytics data for one site over an open-ended date range.
+
+    Params: site (required), start and end (ISO dates; either or both may be
+    omitted). Returns the Count-model aggregates grouped by the tracker
+    categories, plus the recent-visits log from Redis.
+    """
+    user, sessionless, demo = _resolve_account(request)
+    if user is None:
+        return _error("not signed in", 401)
+
+    site = request.GET.get("site", "")
+    hosts = {h.name: h for h in _sites_for(user)}
+    if site not in hosts:
+        return _error("no such site")
+
     try:
-        utcoffset = _utcoffset(request)
-        from_date = date.fromisoformat(request.GET["from"]) if request.GET.get("from") else None
-        to_date = date.fromisoformat(request.GET["to"]) if request.GET.get("to") else None
+        start = date.fromisoformat(request.GET["start"]) if request.GET.get("start") else None
+        end = date.fromisoformat(request.GET["end"]) if request.GET.get("end") else None
     except ValueError:
         return _error("invalid date")
+    # Open-ended: missing bounds fall back to the same "all" window the
+    # dashboard previously used.
+    start = start or date(2000, 1, 1)
+    end = end or _local_date(_utcoffset(request)) + timedelta(days=365)
 
-    def message(event, payload):
-        return f"data: {json.dumps({'type': event, 'payload': payload})}\n\n"
-
-    def event_stream():
-        if user is None:
-            yield message("nouser", {})
-            return
-        yield message("signedin", {"uuid": str(user.uuid)})
-        interval = 15
-        while True:
-            try:
-                payload = _build_dump_payload(
-                    utcoffset, user, from_date, to_date, demo=demo, sessionless=sessionless
-                )
-                yield message("dump", payload)
-            except Exception:
-                yield message("nouser", {})
-                return
-            time.sleep(interval)
-
-    response = StreamingHttpResponse(
-        streaming_content=event_stream(),
-        content_type="text/event-stream",
+    visits = _query_site_data(hosts[site], start, end)
+    for category in CATEGORIES:
+        visits.setdefault(category, {})
+    return _json(
+        {
+            "site": site,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "visits": visits,
+            "logs": _get_user_logs(user, site=site, limit=30),
+        }
     )
-    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response["X-Accel-Buffering"] = "no"
-    return response
 
 
 # --- Misc -------------------------------------------------------------------------

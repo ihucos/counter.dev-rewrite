@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   API_BASE,
   addSite,
-  readFirstDump,
+  readMe,
   signUp,
   trackVisit,
   uniqueName,
@@ -11,7 +11,7 @@ import {
 
 // A fresh account whose one site receives tracking data sent as plain HTTP
 // requests to the tracker, exactly like the external tracking script does.
-// The dashboard is then expected to visualize it via the /dump SSE stream.
+// The dashboard is then expected to visualize it via the /query endpoint.
 const SITE = "e2e-dashboard.example";
 
 async function accountWithData(page: Page, visits: number) {
@@ -35,8 +35,8 @@ async function accountWithData(page: Page, visits: number) {
 
   await waitForVisits(page, SITE, visits);
 
-  // The dashboard only redraws on the next dump; reload to pick up the
-  // data immediately.
+  // The dashboard only fetches on load and on user interactions; reload to
+  // pick up the data immediately.
   await page.reload();
   await expect(page.locator("#site-select")).toHaveValue(SITE, { timeout: 15_000 });
 
@@ -58,12 +58,12 @@ test("the selected range is remembered across reloads", async ({ page }) => {
 test("guest share access shows the dashboard without a session", async ({ page, browser }) => {
   await accountWithData(page, 10);
 
-  // Enable guest access and grab the account uuid from the dump stream.
+  // Enable guest access and grab the account uuid from the /me endpoint.
   const res = await page.request.post(`${API_BASE}/reset_token`);
   expect(res.status()).toBe(200);
   const { token } = await res.json();
-  const dump = await readFirstDump(page);
-  const uuid = dump?.user?.uuid;
+  const me = await readMe(page);
+  const uuid = me?.user?.uuid;
   expect(uuid).toBeTruthy();
 
   // An anonymous visitor with the share link sees the same data.
@@ -79,4 +79,27 @@ test("guest share access shows the dashboard without a session", async ({ page, 
   await expect(intruder).toHaveURL(/welcome\.html$/, { timeout: 15_000 });
 
   await guest.close();
+});
+
+test("no live connection remains open after the dashboard loaded", async ({ page }) => {
+  await accountWithData(page, 10);
+
+  // The dashboard fetches only on load and on user interactions; there is
+  // no SSE /dump connection to the backend anymore.
+  const dumpRequests = await page.evaluate(
+    () =>
+      performance
+        .getEntriesByType("resource")
+        .filter((e) => new URL(e.name).pathname === "/dump").length,
+  );
+  expect(dumpRequests).toBe(0);
+  // Let any live reconnects surface; nothing should re-request /dump.
+  await page.waitForTimeout(2000);
+  const dumpRequestsLater = await page.evaluate(
+    () =>
+      performance
+        .getEntriesByType("resource")
+        .filter((e) => new URL(e.name).pathname === "/dump").length,
+  );
+  expect(dumpRequestsLater).toBe(0);
 });

@@ -25,10 +25,6 @@ customElements.define(
             }
             this.last_sites = sites;
 
-            if (dump.meta.demo) {
-                sites = ["counter.dev"];
-            }
-
             var sitePref = dump.user.prefs.site;
             var rangePref = dump.user.prefs.range;
 
@@ -71,11 +67,7 @@ customElements.define(
             fetch(apiUrl("/set_pref_site?") + encodeURIComponent(this.site), { credentials: "include" });
             this.dump.user.prefs.site = this.site;
 
-            document.dispatchEvent(
-                new CustomEvent("redraw", {
-                    detail: this.dump,
-                }),
-            );
+            document.dispatchEvent(new Event("dashboard-state-changed"));
         }
 
         onRangeSelChanged(evt) {
@@ -90,11 +82,7 @@ customElements.define(
                 fetch(apiUrl("/set_pref_range?") + encodeURIComponent(this.range), { credentials: "include" });
             }
             this.dump.user.prefs.range = this.range;
-            document.dispatchEvent(
-                new CustomEvent("redraw", {
-                    detail: this.dump,
-                }),
-            );
+            document.dispatchEvent(new Event("dashboard-state-changed"));
         }
 
         get site() {
@@ -106,7 +94,6 @@ customElements.define(
         }
 
         handleDateRangeFetched(obj) {
-            let resp = obj.resp;
             let from = obj.from;
             let to = obj.to;
             if (from.isSame(to, "day")) {
@@ -117,16 +104,6 @@ customElements.define(
             let origArchiveTxt = $('#range-select option[value="daterangeset"]').text();
             $('#range-select option[value="daterange"]').remove();
             $('#range-select option[value="daterangeset"]').val("daterange").text(tofrom).after($("<option/>").attr("value", "daterangeset").text(origArchiveTxt));
-
-            window.state.daterange;
-            window.state.daterange = resp;
-            patchDump(this.dump);
-
-            document.dispatchEvent(
-                new CustomEvent("redraw", {
-                    detail: this.dump,
-                }),
-            );
         }
     },
 );

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API_BASE, addSite, readFirstDump, signUp, uniqueName } from "./helpers";
+import { API_BASE, addSite, listSites, readMe, signUp, uniqueName } from "./helpers";
 
 // Tests for the account-level flows reachable through the UI: sign out,
 // the edit-account modal (settings + sites), deleting a site, feedback,
@@ -55,19 +55,19 @@ test("editing the account through the modal saves settings and sites", async ({ 
     timeout: 15_000,
   });
 
-  // The reload can still be in flight when the select reappears; poll the
-  // dump until the saved state shows up.
-  let dump: Awaited<ReturnType<typeof readFirstDump>> = null;
+  // The reload can still be in flight when the select reappears; poll
+  // /me until the saved state shows up.
+  let me: Awaited<ReturnType<typeof readMe>> = null;
   await expect
     .poll(
       async () => {
-        dump = await readFirstDump(page).catch(() => null);
-        return dump?.user?.timezone;
+        me = await readMe(page).catch(() => null);
+        return me?.user?.timezone;
       },
       { timeout: 15_000 },
     )
     .toBe(2);
-  expect(Object.keys(dump?.sites ?? {}).sort()).toEqual([
+  expect((await listSites(page))?.map((s) => s.name).sort()).toEqual([
     "e2e-edit-a.example",
     "e2e-edit-b.example",
   ]);
@@ -104,8 +104,8 @@ test("deleting the selected site through the settings modal", async ({ page }) =
   // The settings form redirects to the dashboard; with no sites left the
   // dashboard sends the account back to the setup page.
   await expect(page).toHaveURL(/\/setup\.html$/, { timeout: 15_000 });
-  const dump = await readFirstDump(page);
-  expect(Object.keys(dump?.sites ?? {})).toEqual([]);
+  const sites = await listSites(page);
+  expect(sites?.map((s) => s.name) ?? []).toEqual([]);
 });
 
 test("revoking the share token locks out guest access", async ({ page, browser }) => {
@@ -119,8 +119,8 @@ test("revoking the share token locks out guest access", async ({ page, browser }
 
   const res = await page.request.post(`${API_BASE}/reset_token`);
   const { token } = await res.json();
-  const dump = await readFirstDump(page);
-  const uuid = dump?.user?.uuid;
+  const me = await readMe(page);
+  const uuid = me?.user?.uuid;
   expect(uuid).toBeTruthy();
 
   await page.request.post(`${API_BASE}/delete_token`);

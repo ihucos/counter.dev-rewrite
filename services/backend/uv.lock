@@ -58,6 +58,7 @@ dependencies = [
     { name = "django", version = "5.2.14", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "django", version = "6.0.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "django-markdownify" },
+    { name = "djangorestframework" },
     { name = "gunicorn" },
     { name = "psycopg2-binary" },
     { name = "pytest" },
@@ -75,6 +76,7 @@ dev = [
 requires-dist = [
     { name = "django", specifier = ">=5.0" },
     { name = "django-markdownify", specifier = ">=0.9.7" },
+    { name = "djangorestframework", specifier = ">=3.15" },
     { name = "gunicorn", specifier = ">=26.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pytest", specifier = ">=9.0.3" },
@@ -135,6 +137,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/db/ae/2ecbac028f470ed78b8826413495d5ea60c9d53d7af000729ff3a7663ff8/django_markdownify-0.9.7.tar.gz", hash = "sha256:2e59dfd445ad6362288f7bc1574e45d8356848463e261b878fd70df6a272c47f", size = 8084, upload-time = "2026-05-18T06:51:55.279Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/34/b9/9b1a28f605ad75fa7e4588f51661eb3c7c5feb5ad23e985761e9a14d01c4/django_markdownify-0.9.7-py3-none-any.whl", hash = "sha256:ca3a6361f952d1c1b661c13229f69219a36e745358aa0f377212aef8f09e4cf3", size = 10449, upload-time = "2026-05-18T06:51:53.414Z" },
+]
+
+[[package]]
+name = "djangorestframework"
+version = "3.18.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django", version = "5.2.14", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "django", version = "6.0.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/bc/de04e3d4dc65e8b926700956ee70d4f084f2005603d21122d4d0683006fd/djangorestframework-3.18.0.tar.gz", hash = "sha256:2323a5111837e0b784dcb8323abc78ecc54fa2a5af7aff2677cf50cdd849477f", size = 913667, upload-time = "2026-08-07T14:53:33.571Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/d7/7461738e819b853275b35fd35712a85806c09a327e1fd5f8ff766bdd317e/djangorestframework-3.18.0-py3-none-any.whl", hash = "sha256:381fc44d3249c9565c5f723850855b734e99030eb30957a49f506d3fe11d7dcb", size = 900032, upload-time = "2026-08-07T14:53:31.881Z" },
 ]
 
 [[package]]

@@ -14,18 +14,16 @@ data-id parsed from the tracking code itself.
 
 ## Backend doesn't send what the dashboard expects — fixed
 
-`/dump` now includes:
+The dashboard's data endpoints (`/query`, `/me`, `/sites`) now include:
 
-- every tracker category in every range bucket (`ref`, `date`, `hour`,
+- every tracker category in every query result (`ref`, `date`, `hour`,
   `device`, `platform`, `browser`, `country`, `lang`, `screen`, `page`,
   `weekday`), empty where there is no data;
-- `meta.sessionless` (guest access) and `meta.demo` (`?demo=1`);
-- `user.token` (the account's share token).
+- `meta.sessionless` (guest access) and `meta.demo` (`?demo=1`) on `/me`;
+- `user.token` (the account's share token) on `/me`.
 
-The `push-archive` event is still never sent; the frontend falls back to the
-backend's `last7`/`last30` buckets. The frontend additionally normalizes
-buckets and isolates redraw errors per component, so a missing dimension can
-no longer blank the whole dashboard.
+The frontend normalizes buckets and isolates redraw errors per component, so
+a missing dimension can no longer blank the whole dashboard.
 
 ## Demo mode — fixed
 

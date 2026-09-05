@@ -30,7 +30,7 @@ Local and production hostnames mirror each other (`counterdev.test` ↔ `counter
 | sync | Django command | Drains Redis into Postgres |
 | redis / postgres | | Ingest buffer + cache / aggregated counts + users |
 
-Tracking: sites embed `script.js` with a `data-id`; the script beacons to the tracker, which buckets visits in Redis; sync persists aggregates to Postgres; the dashboard reads a single SSE endpoint (`/dump`).
+Tracking: sites embed `script.js` with a `data-id`; the script beacons to the tracker, which buckets visits in Redis; sync persists aggregates to Postgres; the dashboard reads JSON endpoints (`/me`, `/sites`, `/query`).
 
 ## Architecture goals
 

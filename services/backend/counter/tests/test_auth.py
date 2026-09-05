@@ -1,6 +1,7 @@
 """Integration tests for the documented API (docs/api.md)."""
 
 import json
+from datetime import date, timedelta
 from urllib.parse import quote
 
 import pytest
@@ -9,29 +10,9 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-from core.models import Host
+from core.models import Count, Host
 
 pytestmark = pytest.mark.django_db
-
-
-def messages(response):
-    """Parse the SSE messages until the stream is exhausted or a dump arrives.
-
-    The dump stream repeats every 15s, so stop once the first dump arrives.
-    """
-    out = []
-    buffer = ""
-    for chunk in response.streaming_content:
-        buffer += chunk.decode()
-        while "\n\n" in buffer:
-            part, buffer = buffer.split("\n\n", 1)
-            part = part.strip()
-            if part.startswith("data: "):
-                message = json.loads(part[len("data: "):])
-                out.append(message)
-                if message["type"] == "dump":
-                    return out
-    return out
 
 
 class TestRegister:
@@ -176,47 +157,152 @@ class TestPrefs:
         assert client.get("/set_pref_range?nope").status_code == 400
 
 
-class TestDump:
-    def test_nouser(self, client):
-        resp = client.get("/dump")
+class TestMe:
+    def test_me_not_signed_in(self, client):
+        resp = client.get("/me")
+        assert resp.status_code == 401
+
+    def test_me_signed_in(self, client, user, host):
+        client.force_login(user)
+        resp = client.get("/me?utcoffset=60")
+        body = json.loads(resp.content)
+        assert body["user"]["id"] == "testuser"
+        assert body["user"]["uuid"] == str(user.uuid)
+        assert body["user"]["prefs"] == {}
+        assert body["user"]["timezone"] == 0
+        assert body["meta"] == {"utcoffset": 60, "sessionless": False, "demo": False}
+
+    def test_me_guest_access(self, client, user, host):
+        user.share_token = "tok123"
+        user.save()
+        resp = client.get(f"/me?user={user.uuid}&token=tok123")
+        body = json.loads(resp.content)
+        assert body["user"]["id"] == "testuser"
+        assert body["meta"]["sessionless"] is True
+        assert body["meta"]["demo"] is False
+
+    def test_me_guest_wrong_token(self, client, user, host):
+        user.share_token = "tok123"
+        user.save()
+        assert client.get(f"/me?user={user.uuid}&token=bad").status_code == 401
+
+    def test_me_demo_access(self, client, user, host):
+        User.objects.create_user(username="demo", password="x")
+        resp = client.get("/me?demo=1")
+        body = json.loads(resp.content)
+        assert body["meta"]["demo"] is True
+        assert body["meta"]["sessionless"] is True
+
+
+class TestQuery:
+    def test_query_not_signed_in(self, client, host):
+        assert client.get("/query?site=example.com").status_code == 401
+
+    def test_query_signed_in(self, client, user, host, counts):
+        client.force_login(user)
+        resp = client.get("/query?site=example.com")
+        body = json.loads(resp.content)
+        assert body["site"] == "example.com"
+        # Open-ended: the default window covers all seeded counts.
+        assert body["visits"]["pageview"]["/home"] == 13
+        assert body["visits"]["click"]["button1"] == 2
+        # Every category is present so the frontend never reads undefined
+        # dimensions.
+        for category in [
+            "lang", "ref", "page", "date", "weekday", "platform",
+            "browser", "device", "country", "screen", "hour",
+        ]:
+            assert category in body["visits"]
+
+    def test_query_bounded_range(self, client, user, host, counts):
+        client.force_login(user)
+        today = date.today()
+        resp = client.get(f"/query?site=example.com&start={today}&end={today}")
+        body = json.loads(resp.content)
+        assert body["visits"]["pageview"]["/home"] == 10
+        assert body["visits"]["click"] == {"button1": 2}
+
+    def test_query_missing_end(self, client, user, host, counts):
+        client.force_login(user)
+        yesterday = date.today() - timedelta(days=1)
+        resp = client.get(f"/query?site=example.com&start={yesterday}")
+        body = json.loads(resp.content)
+        assert body["visits"]["pageview"]["/home"] == 13
+
+    def test_query_missing_start(self, client, user, host, counts):
+        client.force_login(user)
+        yesterday = date.today() - timedelta(days=1)
+        resp = client.get(f"/query?site=example.com&end={yesterday}")
+        body = json.loads(resp.content)
+        assert body["visits"]["pageview"]["/home"] == 3
+
+    def test_query_invalid_date(self, client, user, host, counts):
+        client.force_login(user)
+        resp = client.get("/query?site=example.com&start=nope")
+        assert resp.status_code == 400
+
+    def test_query_unknown_site(self, client, user):
+        client.force_login(user)
+        assert client.get("/query?site=other.com").status_code == 400
+
+    def test_query_guest_access(self, client, user, host, counts):
+        user.share_token = "tok123"
+        user.save()
+        resp = client.get(f"/query?site=example.com&user={user.uuid}&token=tok123")
+        body = json.loads(resp.content)
+        assert body["visits"]["pageview"]["/home"] == 13
+
+    def test_query_guest_wrong_token(self, client, user, host):
+        user.share_token = "tok123"
+        user.save()
+        resp = client.get(f"/query?site=example.com&user={user.uuid}&token=bad")
+        assert resp.status_code == 401
+
+    def test_query_demo_access(self, client, user, host, counts):
+        demo = User.objects.create_user(username="demo", password="x")
+        demo_host = Host.objects.create(user=demo, name="demo.example")
+        Count.objects.create(host=demo_host, date=date.today(), category="pageview", item="/home", total=7)
+        resp = client.get("/query?site=demo.example&demo=1")
+        body = json.loads(resp.content)
+        assert body["site"] == "demo.example"
+        assert body["visits"]["pageview"]["/home"] == 7
+
+
+class TestSites:
+    def test_sites_not_signed_in(self, client):
+        resp = client.get("/sites")
+        assert resp.status_code == 401
+
+    def test_sites_signed_in(self, client, user, host):
+        Host.objects.create(user=user, name="other.com")
+        client.force_login(user)
+        resp = client.get("/sites")
+        body = json.loads(resp.content)
+        assert body == [
+            {"name": "example.com", "hide": True},
+            {"name": "other.com", "hide": True},
+        ]
+
+    def test_site_retrieve(self, client, user, host):
+        client.force_login(user)
+        resp = client.get("/sites/example.com")
+        assert json.loads(resp.content)["name"] == "example.com"
+
+    def test_sites_guest_access(self, client, user, host):
+        user.share_token = "tok123"
+        user.save()
+        resp = client.get(f"/sites?user={user.uuid}&token=tok123")
         assert resp.status_code == 200
-        assert resp["Content-Type"] == "text/event-stream"
-        assert messages(resp)[0]["type"] == "nouser"
+        assert [s["name"] for s in json.loads(resp.content)] == ["example.com"]
 
-    def test_dump_signed_in(self, client, user, host, counts):
+    def test_sites_demo_access(self, client, user, host):
+        User.objects.create_user(username="demo", password="x")
+        assert client.get("/sites?demo=1").status_code == 200
+
+    def test_sites_no_write_methods(self, client, user, host):
         client.force_login(user)
-        resp = client.get("/dump?utcoffset=60")
-        signedin, dump = messages(resp)[:2]
-        assert signedin["type"] == "signedin"
-        assert dump["type"] == "dump"
-        sites = dump["payload"]["sites"]
-        assert sites["example.com"]["visits"]["day"]["pageview"]["/home"] == 10
-        assert sites["example.com"]["visits"]["yesterday"]["pageview"]["/home"] == 3
-        assert dump["payload"]["meta"]["utcoffset"] == 60
-
-    def test_dump_guest_access(self, client, user, host, counts):
-        user.share_token = "tok123"
-        user.save()
-        resp = client.get(f"/dump?user={user.uuid}&token=tok123")
-        dump = messages(resp)[1]
-        assert "example.com" in dump["payload"]["sites"]
-
-    def test_dump_guest_wrong_token(self, client, user, host):
-        user.share_token = "tok123"
-        user.save()
-        resp = client.get(f"/dump?user={user.uuid}&token=bad")
-        assert messages(resp)[0]["type"] == "nouser"
-
-    def test_dump_custom_range(self, client, user, host, counts):
-        client.force_login(user)
-        from datetime import date, timedelta
-
-        to = date.today()
-        frm = to - timedelta(days=6)
-        resp = client.get(f"/dump?from={frm}&to={to}")
-        dump = messages(resp)[1]
-        visits = dump["payload"]["sites"]["example.com"]["visits"]
-        assert visits["custom"]["pageview"]["/home"] == 13
+        assert client.post("/sites", {"name": "nope.com"}).status_code == 405
+        assert client.delete("/sites/example.com").status_code == 405
 
 
 class TestMisc:

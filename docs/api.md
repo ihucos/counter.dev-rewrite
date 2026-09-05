@@ -102,29 +102,63 @@ Persist the selected time range. Value is one of `day`, `yesterday`, `last7`,
 
 ## Dashboard data
 
-### GET /dump (Server-Sent Events)
+All three endpoints serve a signed-in session, guest/share access via
+`?user=<uuid>&token=<token>`, or read-only demo access via `?demo=1`. A
+missing or invalid account answers **401** ("not signed in"); the SPA
+redirects to the welcome page accordingly.
 
-Streams the full account state: sites, user record, preferences, and visit data.
-Query parameters:
+### GET /me
 
-| Parameter | Type | Description |
-|---|---|---|
-| `utcoffset` | integer | Client UTC offset in minutes, used to bucket visits by local time |
-| (any) | — | Custom range requests additionally pass `from` and `to` dates |
-
-Each message is a JSON object:
+The signed-in user's state: session bootstrap, share-account panel, and
+demo/guest flags.
 
 ```json
-{ "type": "<event type>", "payload": { ... } }
+{
+  "user": { "id": "...", "uuid": "...", "token": "...", "prefs": {}, "timezone": 0 },
+  "meta": { "utcoffset": 0, "sessionless": false, "demo": false }
+}
 ```
 
-Event types include `dump` (full state), `nouser` (no signed-in user), and
-`signedin`.
+### GET /sites
 
-### GET /?from=\<date\>&to=\<date\>
+Readonly DRF API (list and retrieve only) exposing the sites resource
+(`Host` model) in name order. The list is the source of truth for which
+sites an account has (setup-vs-dashboard routing and the site selector).
 
-Dashboard view restricted to a custom date range (`from`/`to` dates).
+```json
+[ { "name": "example.com", "hide": true }, ... ]
+```
 
+`GET /sites/<name>` retrieves a single site.
+
+### GET /query
+
+Analytics data for one site, drawn from the aggregated `Count` model.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `site` | string | yes | Site name (must belong to the account) |
+| `start` | date (ISO) | no | Range start; omitted means unbounded past |
+| `end` | date (ISO) | no | Range end; omitted means unbounded future |
+
+The range is open-ended: either or both dates may be omitted. Fixed presets
+(today, yesterday, last 7/30 days, month, year, all time) are computed
+client-side as `start`/`end` values.
+
+```json
+{
+  "site": "example.com",
+  "start": "2026-01-01",
+  "end": "2026-09-05",
+  "visits": { "lang": {"en": 3}, "ref": {...}, "page": {...}, "date": {...}, "weekday": {...}, "platform": {...}, "browser": {...}, "device": {...}, "country": {...}, "screen": {...}, "hour": {...} },
+  "logs": [ { "date": "2026-09-05", "time": "12:00:00", "country": "de", "referrer": "...", "device": "...", "platform": "..." } ]
+}
+```
+
+Every category is present (empty where there is no data); `logs` holds the
+recent visits from the Redis zset.
+
+## Misc
 ## Misc
 
 ### GET /lang

@@ -202,11 +202,19 @@ customElements.define(
         }
 
         highlightPersonalizedSuggestion(dump) {
+            // The navbar payload no longer carries visit data; the
+            // dashboard keeps its state in window.dump.
+            if (!dump.sites && window.dump) {
+                dump = window.dump;
+            }
+            if (!dump.sites) {
+                return;
+            }
             var allHitsPerDay = Object.values(dump.sites)
                 .map(
                     // for every site
                     (i) =>
-                        Object.entries(i.visits.all.date)
+                        Object.entries((i.visits.all || {}).date || {})
                             .sort()
                             .slice(-7)
                             .map(

@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "markdownify.apps.MarkdownifyConfig",
     # Custom apps
+    "rest_framework",
     "counter",
     "core",
 ]
@@ -69,6 +70,13 @@ CACHES = {
 }
 
 AUTH_USER_MODEL = "counter.User"
+
+# The API is consumed by the SPA via fetch(); JSON only, no browsable API
+# templates, and no pagination so the sites list is a plain array.
+REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
+}
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
