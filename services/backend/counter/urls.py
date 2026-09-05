@@ -1,10 +1,13 @@
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import SimpleRouter
 
 from core import api
-from core import views as api_views
+
+router = SimpleRouter(trailing_slash="")
+router.register("sites", api.SiteViewSet, basename="sites")
 
 urlpatterns = [
     # Authentication & account
@@ -17,8 +20,6 @@ urlpatterns = [
     path("feedback", api.feedback_view, name="feedback"),
     # Sites
     path("delete_site", api.delete_site_view, name="delete_site"),
-    path("sites", api.SiteViewSet.as_view({"get": "list"}), name="sites"),
-    path("sites/<str:site>", api.SiteViewSet.as_view({"get": "retrieve"}), name="site_detail"),
     # Guest / share access
     path("reset_token", api.reset_token_view, name="reset_token"),
     path("delete_token", api.delete_token_view, name="delete_token"),
@@ -32,5 +33,6 @@ urlpatterns = [
     path("lang", api.lang_view, name="lang"),
     path("newsletter_register", api.newsletter_register_view, name="newsletter_register"),
     path("subscribed", api.subscribed_view, name="subscribed"),
+    path("", include(router.urls)),
     path("admin/", admin.site.urls),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

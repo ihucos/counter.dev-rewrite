@@ -74,6 +74,7 @@ AUTH_USER_MODEL = "counter.User"
 # The API is consumed by the SPA via fetch(); JSON only, no browsable API
 # templates, and no pagination so the sites list is a plain array.
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["core.authentication.AccountAuthentication"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
 }

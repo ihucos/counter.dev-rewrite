@@ -31,7 +31,7 @@ class TestRegister:
     def test_register_duplicate_user(self, client, user):
         resp = client.post("/register", {"user": "testuser", "password": "x" * 8, "utcoffset": 0})
         assert resp.status_code == 400
-        assert resp.content.decode() == "user already exists"
+        assert resp.json()["detail"] == "user already exists"
 
 
 class TestLogin:
@@ -43,12 +43,12 @@ class TestLogin:
     def test_login_wrong_password(self, client, user):
         resp = client.post("/login", {"user": "testuser", "password": "nope"})
         assert resp.status_code == 400
-        assert resp.content.decode() == "wrong password"
+        assert resp.json()["detail"] == "wrong password"
 
     def test_login_unknown_user(self, client):
         resp = client.post("/login", {"user": "ghost", "password": "nope"})
         assert resp.status_code == 400
-        assert resp.content.decode() == "no such user"
+        assert resp.json()["detail"] == "no such user"
 
 
 class TestRecover:

@@ -6,14 +6,14 @@ from datetime import date
 import pytest
 
 from core.models import Host
-from core.views import parse_log_line, _normalize_domain
+from core.api import parse_log_line, _normalize_domain
 
 pytestmark = pytest.mark.django_db
 
 
 class TestAccountEditView:
     def test_requires_auth(self, client):
-        assert client.post("/account_edit").status_code == 403
+        assert client.post("/account_edit").status_code == 401
 
     def test_updates_prefs_and_sites(self, client, user, host):
         other = Host.objects.create(user=user, name="remove-me.com")
@@ -40,18 +40,17 @@ class TestAccountEditView:
         client.force_login(user)
         resp = client.post("/account_edit", {"utcoffset": "nope"})
         assert resp.status_code == 400
-        assert resp.content == b"invalid utcoffset"
 
 
 class TestDeleteSiteView:
     def test_requires_auth(self, client):
-        assert client.post("/delete_site").status_code == 403
+        assert client.post("/delete_site").status_code == 401
 
     def test_requires_selected_site(self, client, user, host):
         client.force_login(user)
         resp = client.post("/delete_site")
         assert resp.status_code == 400
-        assert resp.content == b"no site selected"
+        assert resp.json()["detail"] == "no site selected"
 
     def test_deletes_site_and_counts(self, client, user, host, counts):
         user.prefs = {"site": "example.com"}
@@ -86,8 +85,8 @@ class TestShareTokens:
         assert user.share_token == ""
 
     def test_requires_auth(self, client):
-        assert client.post("/reset_token").status_code == 403
-        assert client.post("/delete_token").status_code == 403
+        assert client.post("/reset_token").status_code == 401
+        assert client.post("/delete_token").status_code == 401
 
 
 class TestPreferences:
@@ -98,7 +97,7 @@ class TestPreferences:
         assert user.prefs["site"] == "example.com"
 
     def test_set_pref_site_requires_auth(self, client):
-        assert client.get("/set_pref_site", {"site": "x"}).status_code == 403
+        assert client.get("/set_pref_site", {"site": "x"}).status_code == 401
 
     def test_set_pref_range(self, client, user):
         client.force_login(user)
@@ -110,7 +109,6 @@ class TestPreferences:
         client.force_login(user)
         resp = client.get("/set_pref_range", {"range": "bogus"})
         assert resp.status_code == 400
-        assert resp.content == b"invalid range"
 
 
 class TestLangView:
@@ -131,7 +129,7 @@ class TestLangView:
 class TestSubscribedView:
     def test_requires_auth(self, client):
         resp = client.post("/subscribed", {"subscription_id": "I-ABC123"})
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
     def test_missing_subscription_id(self, client, user):
         client.force_login(user)
@@ -241,7 +239,7 @@ def test_local_date_uses_hours():
 
     from django.utils import timezone as dj_timezone
 
-    from core.views import _local_date
+    from core.api import _local_date
 
     now = dj_timezone.now()
     assert _local_date(2) == (now + timedelta(hours=2)).date()

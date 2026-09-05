@@ -7,7 +7,9 @@ cross-origin access with credentials. Authentication is a session cookie managed
 by the server. Guest/share access to a dashboard uses
 `?user=<id>&token=<token>` query parameters instead of a session.
 
-All names are lowercase snake_case.
+The API is implemented with Django REST Framework. All endpoints return JSON
+(bodies are validated by serializers and accept both form-encoded and JSON
+input); a successful mutation answers `{ "ok": true }`.
 
 ## Authentication & account
 
@@ -20,7 +22,7 @@ Sign in.
 | `user` | string | yes | Username |
 | `password` | string | yes | Password |
 
-On success the session cookie is set.
+On success the session cookie is set (body `{ "ok": true }`).
 
 ### GET /logout
 
@@ -184,4 +186,7 @@ Sent as JSON or form field:
 
 ## Errors
 
-Failed requests return the error message in the response body as plain text.
+Failed requests return JSON errors: `{ "detail": "..." }` for a single
+message (e.g. `"no such user"`, `"wrong password"`, `"user already exists"`)
+or `{ "<field>": ["..."] }` for serializer validation errors. Unauthenticated
+requests answer 401.

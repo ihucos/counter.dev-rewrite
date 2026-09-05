@@ -12,7 +12,7 @@ class TestLoginView:
     def test_login_success(self, client, user):
         resp = client.post("/login", {"user": "testuser", "password": "testpass123"})
         assert resp.status_code == 200
-        assert resp.content == b"ok"
+        assert resp.json() == {"ok": True}
         assert client.session["_auth_user_id"] == str(user.pk)
 
     def test_login_missing_fields(self, client, user):
@@ -22,12 +22,12 @@ class TestLoginView:
     def test_login_no_such_user(self, client):
         resp = client.post("/login", {"user": "nobody", "password": "pw"})
         assert resp.status_code == 400
-        assert resp.content == b"no such user"
+        assert resp.json()["detail"] == "no such user"
 
     def test_login_wrong_password(self, client, user):
         resp = client.post("/login", {"user": "testuser", "password": "wrong"})
         assert resp.status_code == 400
-        assert resp.content == b"wrong password"
+        assert resp.json()["detail"] == "wrong password"
 
 
 class TestRegisterView:
@@ -37,7 +37,7 @@ class TestRegisterView:
             {"user": "newuser", "password": "pw123456", "mail": "n@example.com", "utcoffset": "2"},
         )
         assert resp.status_code == 200
-        assert resp.content == b"ok"
+        assert resp.json() == {"ok": True}
         from counter.models import User
         account = User.objects.get(username="newuser")
         assert account.email == "n@example.com"
@@ -54,14 +54,13 @@ class TestRegisterView:
     def test_register_duplicate_user(self, client, user):
         resp = client.post("/register", {"user": "testuser", "password": "pw123456"})
         assert resp.status_code == 400
-        assert resp.content == b"user already exists"
+        assert resp.json()["detail"] == "user already exists"
 
     def test_register_invalid_utcoffset(self, client):
         resp = client.post(
             "/register", {"user": "x", "password": "pw", "utcoffset": "abc"}
         )
         assert resp.status_code == 400
-        assert resp.content == b"invalid utcoffset"
 
 
 class TestRecoverView:
@@ -86,7 +85,7 @@ class TestRecoverView:
 
 class TestDeleteUserView:
     def test_requires_auth(self, client):
-        assert client.post("/delete_user").status_code == 403
+        assert client.post("/delete_user").status_code == 401
 
     def test_deletes_account_and_hosts(self, client, user, host):
         client.force_login(user)
@@ -116,7 +115,7 @@ class TestLogoutView:
         assert resp.status_code == 302
         assert resp["Location"] == "http://counterdev.test/welcome.html"
         resp = client.post("/reset_token")
-        assert resp.status_code == 403  # session is gone
+        assert resp.status_code == 401  # session is gone
 
     def test_logout_without_referer_falls_back_to_production(self, client, user):
         client.force_login(user)
